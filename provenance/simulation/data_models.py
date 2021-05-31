@@ -21,12 +21,11 @@ docstring goes here
 import logging
 from enum import Enum
 from uuid import UUID
-from typing import Union
+from typing import List, Union
 
 
-from pydantic import BaseModel, HttpUrl, AnyUrl, validator, ValidationError
-from fastapi.encoders import jsonable_encoder
-from fastapi import HTTPException, status
+from pydantic import Field
+
 
 from ..common.data_models import (
     File,
@@ -36,10 +35,13 @@ from ..common.data_models import (
     ModelVersionReference,
 )
 
+from .examples import EXAMPLES
+
 logger = logging.getLogger("ebrains-prov-api")
 
 
 class Simulator(str, Enum):
+    """docstring for Simulator goes here"""
     nest="NEST"
     neuron="NEURON"
     brian="Brian"
@@ -51,12 +53,32 @@ class Simulator(str, Enum):
 class Simulation(Computation):
     """Record of a numerical simulation"""
 
-    input: Union[File, ModelVersionReference, SoftwareVersion]
+    input: List[Union[File, ModelVersionReference, SoftwareVersion]] = Field(..., description="Inputs to this simulation (models, data files, configuration files and/or code)")
     # informed_by: "SimulationNew" = None
+
+    class Config:
+        schema_extra = EXAMPLES["Simulation"]
 
 
 class SimulationPatch(ComputationPatch):
     """Correction of or update to a record of a numerical simulation"""
 
-    input: Union[File, ModelVersionReference, SoftwareVersion] = None
+    input: List[Union[File, ModelVersionReference, SoftwareVersion]] = None
     # informed_by: "Simulation" = None
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "end_time": "2021-05-28T16:32:58.597Z",
+                "status": "failed",
+                "resource_usage": [
+                    {
+                        "value": 1017.3,
+                        "units": "core-hours"
+                    }
+                ],
+                "tags": [
+                    "core-dump"
+                ]
+            }
+        }

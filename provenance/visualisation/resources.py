@@ -38,5 +38,8 @@ router = APIRouter()
 
 
 @router.get("/visualisations/", response_model=List[Visualisation])
-def query_simulations():
+def query_visualisations():
+    """
+    The API definition for visualisations is incomplete, but will be similar to that for simulations and data analyses
+    """
     pass

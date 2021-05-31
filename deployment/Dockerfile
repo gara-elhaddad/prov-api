@@ -5,7 +5,7 @@
 #   docker build -t prov_api -f deployment/Dockerfile .
 #
 # To run the application:
-#   docker run -d -p 443 -v /etc/letsencrypt:/etc/letsencrypt \
+#   docker run -d -p 443:443 -v /etc/letsencrypt:/etc/letsencrypt \
 #              -e KG_SERVICE_ACCOUNT_REFRESH_TOKEN \
 #              -e KG_SERVICE_ACCOUNT_CLIENT_ID \
 #              -e KG_SERVICE_ACCOUNT_SECRET \

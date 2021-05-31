@@ -54,6 +54,9 @@ def query_simulations(
     """
     Query recorded simulations, filtered according to various criteria.
 
+    Where multiple filters are applied, they are combined with AND,
+    e.g. simulator=nest&platform=pizdaint returns NEST simulations that ran on Piz Daint.
+
     The list may contain records of simulations that are public, were performed by the logged-in user,
     or that are associated with a collab of which the user is a member.
     """
@@ -110,7 +113,7 @@ def update_simulation(
     pass
 
 
-@router.delete("/simulations/{simulation_id}", response_model=Simulation)
+@router.delete("/simulations/{simulation_id}")
 def delete_simulation(simulation_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Delete a simulation record.

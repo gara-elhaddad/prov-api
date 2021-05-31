@@ -15,4 +15,4 @@ services:
       - EBRAINS_IAM_CLIENT_ID=
       - EBRAINS_IAM_SECRET=
       - SESSIONS_SECRET_KEY=
-      - BASE_URL=https://prov.brainsimulation.eu
+      - PROV_API_BASE_URL=https://prov.brainsimulation.eu

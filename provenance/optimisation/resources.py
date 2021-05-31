@@ -39,4 +39,5 @@ router = APIRouter()
 
 @router.get("/optimisations/", response_model=List[Optimisation])
 def query_optimisations():
+    """The API definition for optimisations is incomplete, but will be similar to that for simulations and data analyses"""
     pass
