@@ -19,8 +19,13 @@ docstring goes here
 """
 
 from enum import Enum
+from os import environ
 from uuid import UUID
 from typing import List, Union, Optional
+import re
+
+from pydantic.errors import DecimalIsNotFiniteError
+
 try:
     from typing import Literal  # Python >= 3.8
 except ImportError:
@@ -28,6 +33,22 @@ except ImportError:
 from decimal import Decimal
 from datetime import datetime
 from pydantic import BaseModel, AnyUrl, Field
+
+from fairgraph.base_v3 import KGProxyV3 as KGProxy
+#from fairgraph.openminds import controlledterms
+from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
+from fairgraph.openminds.core import (
+    Person as KGPerson, ORCID, File as KGFile, Organization as KGOrganization,
+    FileRepository as KGFileRepository, Hash as KGHash, ContentType as KGContentType,
+    SoftwareVersion as KGSoftwareVersion, ParameterSet as KGParameterSet,
+    StringParameter as KGStringParameter, NumericalParameter as KGNumericalParameter
+)
+from fairgraph.openminds.controlledterms import FileRepositoryType, UnitOfMeasurement
+from fairgraph.openminds.computation import (
+    Environment as KGComputationalEnvironment,
+    HardwareSystem as KGHardwareSystem,
+    LaunchConfiguration as KGLaunchConfiguration
+)
 
 from .examples import EXAMPLES
 
@@ -54,6 +75,7 @@ class ContentType(str, Enum):
 
     pdf = "application/pdf"
     png = "image/png"
+    json = "application/json"
     todo = "list to be completed"
 
 
@@ -119,6 +141,65 @@ class Digest(BaseModel):
     algorithm: CryptographicHashFunction
 
 
+# todo: look these up, don't hard code, might have different UUIDs in prod, int, dev, etc.
+CSCS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/e3f16a1a-184e-447d-aced-375c00ec4d41")
+Github = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/8e16b752-a95a-41f9-acc7-7f7e7c950f1d")
+Yale = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/5093d906-e058-47e9-a9eb-ac56354f79fc")  # create ModelDB as an org?
+EBRAINS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/7dfdd91f-3d05-424a-80bd-6d1d5dc11cd3")
+CERN = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/dbf4d089-9be1-4420-822b-87ecb7204840")  # create Zenodo as an org?
+EBI = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/30aa86d9-39b0-45d1-a8c3-a76d64bfe57a")  # create BioModels as an org?
+Bitbucket = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/574d7d5c-056a-4dae-9d1c-921057451199")
+CNRS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/31259b06-91d0-4ad8-acfd-303fc9ed613b")
+
+
+file_location_patterns = {
+    "https://object.cscs.ch": EBRAINS,
+    "swift://cscs.ch": EBRAINS,
+    "https://ksproxy.cscs.ch": EBRAINS,
+    "https://kg.humanbrainproject.org/proxy/export": EBRAINS,
+    "https://github.com": Github,
+    "https://senselab.med.yale.edu": Yale,
+    "http://modeldb.yale.edu": Yale,
+    "http://example.com": None,
+    "https://collab.humanbrainproject.eu": EBRAINS,
+    "collab://": EBRAINS,
+    "https://drive.ebrains.eu": EBRAINS,
+    "https://zenodo.org": CERN,
+    "https://www.ebi.ac.uk": EBI,
+    "https://CrimsonWhite@bitbucket.org": Bitbucket,
+    "http://cns.iaf.cnrs-gif.fr": CNRS,
+}
+
+
+def get_repository_host(url):
+    for fragment, org in file_location_patterns.items():
+        if fragment in url:
+            return org
+    return None
+
+
+def get_repository_iri(url):
+    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>\w+)\/(?P<path>\S*)"
+    match = re.match(pattern, url)
+    if match:
+        return f"https://object.cscs.ch/v1/{match[0]}/{match[1]}"
+    raise NotImplementedError("Repository IRI format not yet supported")
+
+
+def get_repository_name(url):
+    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>\w+)\/(?P<path>\S*)"
+    match = re.match(pattern, url)
+    if match:
+        return match[2]
+    raise NotImplementedError("Repository IRI format not yet supported")
+
+
+def get_repository_type(url):
+    if url.startswith("https://object.cscs.ch"):
+        return FileRepositoryType(name="Swift repository")
+    raise NotImplementedError("Repository IRI format not yet supported")
+
+
 class File(BaseModel):
     """Metadata about a file"""
 
@@ -133,6 +214,26 @@ class File(BaseModel):
 
     class Config:
         schema_extra = {"example": EXAMPLES["File"]}
+
+    def to_kg_object(self, client):
+        file_repository = KGFileRepository(
+            hosted_by=get_repository_host(self.location),
+            iri=get_repository_iri(self.location),
+            name=get_repository_name(self.location),
+            repository_type=get_repository_type(self.location)
+        )
+        content_type = KGContentType(name=self.format.value)
+        hash = KGHash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
+        storage_size = QuantitativeValue(value=float(self.size), unit=UnitOfMeasurement(name="bytes"))
+        file_obj = KGFile(
+            file_repository=file_repository,
+            format=content_type,
+            hash=hash,
+            iri=self.location,
+            name=self.file_name,
+            storage_size=storage_size
+        )
+        return file_obj
 
 
 class HardwareSystem(str, Enum):
@@ -170,6 +271,9 @@ class StringParameter(BaseModel):
             }
         }
 
+    def to_kg_object(self, client):
+        return KGStringParameter(name=self.name, value=self.value)
+
 
 class NumericalParameter(BaseModel):
     """A parameter whose value is a number or physical quantity"""
@@ -187,11 +291,24 @@ class NumericalParameter(BaseModel):
             }
         }
 
+    def to_kg_object(self, client):
+        return KGNumericalParameter(
+            name=self.name,
+            values=QuantitativeValue(value=self.value, units=UnitOfMeasurement(name=self.units))
+        )
+
+
 class ParameterSet(BaseModel):
     """A collection of parameters"""
 
     items: List[Union[StringParameter, NumericalParameter]]
-    description: str
+    description: str = None
+
+    def to_kg_object(self, client):
+        return KGParameterSet(
+            parameters=[item.to_kg_object(client) for item in self.items],
+            context=self.description
+        )
 
 
 class Person(BaseModel):
@@ -210,6 +327,12 @@ class Person(BaseModel):
             }
         }
 
+    def to_kg_object(self, client):
+        obj = KGPerson(family_name=self.family_name, given_name=self.given_name)
+        if self.orcid:
+            obj.digital_identifiers = [ORCID(identifier=self.orcid)]
+        return obj
+
 
 class ResourceUsage(BaseModel):
     """Measurement of the usage of some resource, such as memory, compute time"""
@@ -225,13 +348,16 @@ class ResourceUsage(BaseModel):
             }
         }
 
+    def to_kg_object(self, client):
+        return QuantitativeValue(value=float(self.value), units=UnitOfMeasurement(name=self.units))
+
 
 class SoftwareVersion(BaseModel):
     """Minimal representation of a specific piece of software"""
 
     id: UUID = None
-    name: str
-    version: str
+    software_name: str
+    software_version: str
 
     class Config:
         schema_extra = {
@@ -240,6 +366,13 @@ class SoftwareVersion(BaseModel):
                 "software_version": "2.20.0"
             }
         }
+
+    def to_kg_object(self, client):
+        KGSoftwareVersion.set_strict_mode(False)
+        obj = KGSoftwareVersion(name=self.software_name, version=self.software_version)
+        KGSoftwareVersion.set_strict_mode(True)
+        return obj
+
 
 class ComputationalEnvironment(BaseModel):
     """The environment within which a computation takes place"""
@@ -258,6 +391,15 @@ class ComputationalEnvironment(BaseModel):
     class Config:
         schema_extra = {"example": EXAMPLES["ComputationalEnvironment"]}
 
+    def to_kg_object(self, client):
+        return KGComputationalEnvironment(
+            name=self.name,
+            hardware=KGHardwareSystem(name=self.hardware.value),
+            configurations=[conf.to_kg_object(client) for conf in self.configuration],
+            softwares=[sv.to_kg_object(client) for sv in self.software],
+            description=self.description
+        )
+
 
 class LaunchConfiguration(BaseModel):
     """Metadata describing how a computation was launched"""
@@ -272,6 +414,16 @@ class LaunchConfiguration(BaseModel):
 
     class Config:
         schema_extra = {"example": EXAMPLES["LaunchConfiguration"]}
+
+    def to_kg_object(self, client):
+        self.environment_variables.description = self.environment_variables.description or "environment variables"
+        return KGLaunchConfiguration(
+            name=self.name,
+            description=self.description,
+            executable=self.executable,
+            argumentss=self.arguments,
+            environment_variables=self.environment_variables.to_kg_object(client)
+        )
 
 
 class Computation(BaseModel):

@@ -25,6 +25,9 @@ from typing import Union
 
 
 from pydantic import BaseModel
+from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis, launchconfiguration
+from fairgraph.openminds.controlledterms import ActionStatusType
+from fairgraph.openminds.core import Person as KGPerson
 
 from ..common.data_models import Computation, ComputationPatch
 
@@ -34,7 +37,35 @@ logger = logging.getLogger("ebrains-prov-api")
 class DataAnalysis(Computation):
     """Record of a data analysis"""
 
-    pass
+    @classmethod
+    def from_kg_objects(cls, objects):
+        pass
+
+    def to_kg_objects(self, client):
+        if self.started_by:
+            started_by = self.started_by.to_kg_object(client)
+        else:
+            started_by = KGPerson.me(client)  # todo
+        inputs = [inp.to_kg_object(client) for inp in self.input]
+        outputs = [outp.to_kg_object(client) for outp in self.output]
+        environment = self.environment.to_kg_object(client)
+        launch_configuration = self.launch_config.to_kg_object(client)
+        resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
+        obj = KGDataAnalysis(
+            id=self.id,
+            inputs=inputs,
+            outputs=outputs,
+            environment=environment,
+            launch_configuration=launch_configuration,
+            started_at_time=self.start_time,
+            ended_at_time=self.end_time,
+            started_by=started_by,
+            #was_informed_by= # todo
+            status=ActionStatusType(name=self.status.value),
+            resource_usages=resource_usage,
+            tagss=self.tags
+        )
+        return [started_by, inputs, outputs, environment, launch_configuration, resource_usage]
 
 
 class DataAnalysisPatch(ComputationPatch):
