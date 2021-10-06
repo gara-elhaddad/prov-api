@@ -1,7 +1,7 @@
 
 EXAMPLES = {
     "DataAnalysis": {
-        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "id": "00000000-0000-0000-0000-000000000000",
         "input": [
             {
                 "description": "Demonstration data for validation framework",
@@ -80,8 +80,8 @@ EXAMPLES = {
                 ]
             }
         },
-        "start_time": "2021-05-28T16:32:58.597Z",
-        "end_time": "2021-05-28T16:32:58.597Z",
+        "start_time": "2021-05-28T16:32:58.597000+00:00",
+        "end_time": "2021-05-28T16:32:58.597000+00:00",
         "started_by": {
             "family_name": "Destexhe",
             "given_name": "Alain",

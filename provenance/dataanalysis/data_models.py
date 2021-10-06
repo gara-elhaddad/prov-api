@@ -21,15 +21,20 @@ docstring goes here
 
 import logging
 from uuid import UUID
-from typing import Union
+from fairgraph.utility import as_list
 
-
-from pydantic import BaseModel
-from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis, launchconfiguration
+from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis
 from fairgraph.openminds.controlledterms import ActionStatusType
-from fairgraph.openminds.core import Person as KGPerson
+from fairgraph.openminds.core import (
+    Person as KGPerson,
+    File as KGFile,
+    SoftwareVersion as KGSoftwareVersion
+)
 
-from ..common.data_models import Computation, ComputationPatch
+from ..common.data_models import (
+    Computation, ComputationPatch, Status, Person, ResourceUsage, LaunchConfiguration,
+    ComputationalEnvironment, File, SoftwareVersion
+)
 
 logger = logging.getLogger("ebrains-prov-api")
 
@@ -38,8 +43,29 @@ class DataAnalysis(Computation):
     """Record of a data analysis"""
 
     @classmethod
-    def from_kg_objects(cls, objects):
-        pass
+    def from_kg_object(cls, data_analysis_object, client):
+        dao = data_analysis_object.resolve(client)
+        inputs = []
+        for obj in as_list(dao.inputs):
+            if isinstance(obj, KGFile):
+                inputs.append(File.from_kg_object(obj, client))
+            elif isinstance(obj, KGSoftwareVersion):
+                inputs.append(SoftwareVersion.from_kg_object(obj, client))
+            else:
+                raise TypeError(f"unexpected object type in inputs: {type(obj)}")
+        return cls(
+            id=dao.id,
+            input=inputs,
+            output=[File.from_kg_object(obj, client) for obj in as_list(dao.outputs)],
+            environment=ComputationalEnvironment.from_kg_object(dao.environment, client),
+            launch_config=LaunchConfiguration.from_kg_object(dao.launch_configuration, client),
+            start_time=dao.started_at_time,
+            end_time=dao.ended_at_time,
+            started_by=Person.from_kg_object(dao.started_by, client),
+            status=getattr(Status, dao.status.resolve(client).name),
+            resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(dao.resource_usages)],
+            tags=dao.tags
+        )
 
     def to_kg_objects(self, client):
         if self.started_by:
@@ -62,10 +88,10 @@ class DataAnalysis(Computation):
             started_by=started_by,
             #was_informed_by= # todo
             status=ActionStatusType(name=self.status.value),
-            resource_usages=resource_usage,
-            tagss=self.tags
+            resource_usage=resource_usage,
+            tags=self.tags
         )
-        return [started_by, inputs, outputs, environment, launch_configuration, resource_usage]
+        return [obj, started_by, inputs, outputs, environment, launch_configuration, resource_usage]
 
 
 class DataAnalysisPatch(ComputationPatch):

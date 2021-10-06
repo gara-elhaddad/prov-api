@@ -23,6 +23,8 @@ from os import environ
 from uuid import UUID
 from typing import List, Union, Optional
 import re
+from fairgraph.registry import lookup_by_id
+from fairgraph.utility import as_list
 
 from pydantic.errors import DecimalIsNotFiniteError
 
@@ -34,7 +36,7 @@ from decimal import Decimal
 from datetime import datetime
 from pydantic import BaseModel, AnyUrl, Field
 
-from fairgraph.base_v3 import KGProxyV3 as KGProxy
+from fairgraph.base_v3 import KGProxyV3 as KGProxy, IRI, as_list
 #from fairgraph.openminds import controlledterms
 from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
 from fairgraph.openminds.core import (
@@ -51,6 +53,11 @@ from fairgraph.openminds.computation import (
 )
 
 from .examples import EXAMPLES
+
+
+KGFile.set_strict_mode(False, "is_part_of")
+KGHardwareSystem.set_strict_mode(False, "version")
+KGParameterSet.set_strict_mode(False, "relevant_for")
 
 
 class Status(str, Enum):
@@ -182,7 +189,7 @@ def get_repository_iri(url):
     pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>\w+)\/(?P<path>\S*)"
     match = re.match(pattern, url)
     if match:
-        return f"https://object.cscs.ch/v1/{match[0]}/{match[1]}"
+        return IRI(f"https://object.cscs.ch/v1/{match[0]}/{match[1]}")
     raise NotImplementedError("Repository IRI format not yet supported")
 
 
@@ -215,6 +222,17 @@ class File(BaseModel):
     class Config:
         schema_extra = {"example": EXAMPLES["File"]}
 
+    @classmethod
+    def from_kg_object(cls, file_object, client):
+        return cls(
+            format=[ct for ct in ContentType if ct.value == file_object.format.resolve(client).name][0],
+            hash=Digest(value=file_object.hash.digest, algorithm=CryptographicHashFunction.sha1),
+            location=file_object.iri.value,
+            file_name=file_object.name,
+            size=int(file_object.storage_size.value),
+            description=file_object.content
+        )
+
     def to_kg_object(self, client):
         file_repository = KGFileRepository(
             hosted_by=get_repository_host(self.location),
@@ -229,9 +247,10 @@ class File(BaseModel):
             file_repository=file_repository,
             format=content_type,
             hash=hash,
-            iri=self.location,
+            iri=IRI(self.location),
             name=self.file_name,
-            storage_size=storage_size
+            storage_size=storage_size,
+            content=self.description
         )
         return file_obj
 
@@ -271,6 +290,13 @@ class StringParameter(BaseModel):
             }
         }
 
+    @classmethod
+    def from_kg_object(cls, param):
+        return cls(
+            name=param.name,
+            value=param.value
+        )
+
     def to_kg_object(self, client):
         return KGStringParameter(name=self.name, value=self.value)
 
@@ -291,6 +317,14 @@ class NumericalParameter(BaseModel):
             }
         }
 
+    @classmethod
+    def from_kg_object(cls, param):
+        return cls(
+            name=param.name,
+            value=param.values[0].value,
+            units=param.values[0].units
+        )
+
     def to_kg_object(self, client):
         return KGNumericalParameter(
             name=self.name,
@@ -303,6 +337,21 @@ class ParameterSet(BaseModel):
 
     items: List[Union[StringParameter, NumericalParameter]]
     description: str = None
+
+    @classmethod
+    def from_kg_object(cls, ps_object, client):
+        items = []
+        for param in as_list(ps_object.parameters):
+            if isinstance(param, KGNumericalParameter):
+                items.append(NumericalParameter.from_kg_object(param))
+            elif isinstance(param, KGStringParameter):
+                items.append(StringParameter.from_kg_object(param))
+            else:
+                raise TypeError("unexpected object type in parameter set")
+        return cls(
+            items=items,
+            description=ps_object.context
+        )
 
     def to_kg_object(self, client):
         return KGParameterSet(
@@ -327,6 +376,16 @@ class Person(BaseModel):
             }
         }
 
+    @classmethod
+    def from_kg_object(cls, person, client):
+        person = person.resolve(client)
+        if person.digital_identifiers:
+            orcid = person.digital_identifiers[0].resolve(client).identifier
+        else:
+            orcid = None
+        return cls(given_name=person.given_name, family_name=person.family_name,
+                   orcid=orcid)
+
     def to_kg_object(self, client):
         obj = KGPerson(family_name=self.family_name, given_name=self.given_name)
         if self.orcid:
@@ -348,8 +407,15 @@ class ResourceUsage(BaseModel):
             }
         }
 
+    @classmethod
+    def from_kg_object(cls, resource_usage, client):
+        return cls(
+            value=resource_usage.value,
+            units=resource_usage.unit.resolve(client).name
+        )
+
     def to_kg_object(self, client):
-        return QuantitativeValue(value=float(self.value), units=UnitOfMeasurement(name=self.units))
+        return QuantitativeValue(value=float(self.value), unit=UnitOfMeasurement(name=self.units))
 
 
 class SoftwareVersion(BaseModel):
@@ -366,6 +432,15 @@ class SoftwareVersion(BaseModel):
                 "software_version": "2.20.0"
             }
         }
+
+    @classmethod
+    def from_kg_object(cls, software_version_object, client):
+        svo = software_version_object.resolve(client)
+        return cls(
+            id=svo.id,
+            software_name=svo.name,
+            software_version=svo.version_identifier
+        )
 
     def to_kg_object(self, client):
         KGSoftwareVersion.set_strict_mode(False)
@@ -391,12 +466,24 @@ class ComputationalEnvironment(BaseModel):
     class Config:
         schema_extra = {"example": EXAMPLES["ComputationalEnvironment"]}
 
+    @classmethod
+    def from_kg_object(cls, env_object, client):
+        env = env_object.resolve(client)
+        return cls(
+            id=env.id,
+            name=env.name,
+            hardware=getattr(HardwareSystem, env.hardware.resolve(client).name),
+            configuration=[ParameterSet.from_kg_object(obj, client) for obj in as_list(env.configuration)],
+            software=[SoftwareVersion.from_kg_object(obj, client) for obj in as_list(env.software)],
+            description=env.description
+        )
+
     def to_kg_object(self, client):
         return KGComputationalEnvironment(
             name=self.name,
             hardware=KGHardwareSystem(name=self.hardware.value),
-            configurations=[conf.to_kg_object(client) for conf in self.configuration],
-            softwares=[sv.to_kg_object(client) for sv in self.software],
+            configuration=[conf.to_kg_object(client) for conf in self.configuration],
+            software=[sv.to_kg_object(client) for sv in self.software],
             description=self.description
         )
 
@@ -415,13 +502,24 @@ class LaunchConfiguration(BaseModel):
     class Config:
         schema_extra = {"example": EXAMPLES["LaunchConfiguration"]}
 
+    @classmethod
+    def from_kg_object(cls, launch_config_object, client):
+        lco = launch_config_object.resolve(client)
+        return cls(
+            description=lco.description,
+            name=lco.name,
+            executable=lco.executable,
+            arguments=lco.arguments,
+            environment_variables=ParameterSet.from_kg_object(lco.environment_variables, client)
+        )
+
     def to_kg_object(self, client):
         self.environment_variables.description = self.environment_variables.description or "environment variables"
         return KGLaunchConfiguration(
             name=self.name,
             description=self.description,
             executable=self.executable,
-            argumentss=self.arguments,
+            arguments=self.arguments,
             environment_variables=self.environment_variables.to_kg_object(client)
         )
 
