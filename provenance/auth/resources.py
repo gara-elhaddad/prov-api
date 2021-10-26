@@ -28,6 +28,16 @@ router = APIRouter()
 auth = HTTPBearer()
 
 
+@router.get("/")
+def about_this_api():
+    return {
+        "about": "This is the EBRAINS Provenance API.",
+        "links": {
+            "documentation": "/docs"
+        }
+    }
+
+
 @router.get("/login")
 async def login_via_ebrains(request: Request):
     redirect_uri = BASE_URL + "/auth"

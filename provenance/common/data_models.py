@@ -23,6 +23,8 @@ from os import environ
 from uuid import UUID
 from typing import List, Union, Optional
 import re
+import hashlib
+import json
 from fairgraph.registry import lookup_by_id
 from fairgraph.utility import as_list
 
@@ -317,6 +319,9 @@ class NumericalParameter(BaseModel):
             }
         }
 
+    def __str__(self):
+        return f"{self.name} = {self.value} {self.units}"
+
     @classmethod
     def from_kg_object(cls, param):
         return cls(
@@ -337,6 +342,13 @@ class ParameterSet(BaseModel):
 
     items: List[Union[StringParameter, NumericalParameter]]
     description: str = None
+
+    @property
+    def identifier(self):
+        return hashlib.sha1(
+            json.dumps(
+                [str(item) for item in self.items]
+            ).encode("utf-8")).hexdigest()
 
     @classmethod
     def from_kg_object(cls, ps_object, client):
@@ -437,14 +449,15 @@ class SoftwareVersion(BaseModel):
     def from_kg_object(cls, software_version_object, client):
         svo = software_version_object.resolve(client)
         return cls(
-            id=svo.id,
+            id=client.uuid_from_uri(svo.id),
             software_name=svo.name,
             software_version=svo.version_identifier
         )
 
     def to_kg_object(self, client):
         KGSoftwareVersion.set_strict_mode(False)
-        obj = KGSoftwareVersion(name=self.software_name, version=self.software_version)
+        obj = KGSoftwareVersion(name=self.software_name, alias=self.software_name,
+                                version_identifier=self.software_version)
         KGSoftwareVersion.set_strict_mode(True)
         return obj
 
@@ -470,7 +483,7 @@ class ComputationalEnvironment(BaseModel):
     def from_kg_object(cls, env_object, client):
         env = env_object.resolve(client)
         return cls(
-            id=env.id,
+            id=client.uuid_from_uri(env.id),
             name=env.name,
             hardware=getattr(HardwareSystem, env.hardware.resolve(client).name),
             configuration=[ParameterSet.from_kg_object(obj, client) for obj in as_list(env.configuration)],
@@ -481,7 +494,7 @@ class ComputationalEnvironment(BaseModel):
     def to_kg_object(self, client):
         return KGComputationalEnvironment(
             name=self.name,
-            hardware=KGHardwareSystem(name=self.hardware.value),
+            hardware=KGHardwareSystem(name=self.hardware.value, version="not specified"),
             configuration=[conf.to_kg_object(client) for conf in self.configuration],
             software=[sv.to_kg_object(client) for sv in self.software],
             description=self.description
@@ -502,6 +515,18 @@ class LaunchConfiguration(BaseModel):
     class Config:
         schema_extra = {"example": EXAMPLES["LaunchConfiguration"]}
 
+    @property
+    def identifier(self):
+        return hashlib.sha1(
+            json.dumps(
+                {
+                    "name": self.name,
+                    "executable": self.executable,
+                    "arguments": self.arguments,
+                    "environment_variables": self.environment_variables.identifier
+                }
+            ).encode("utf-8")).hexdigest()
+
     @classmethod
     def from_kg_object(cls, launch_config_object, client):
         lco = launch_config_object.resolve(client)
@@ -515,6 +540,8 @@ class LaunchConfiguration(BaseModel):
 
     def to_kg_object(self, client):
         self.environment_variables.description = self.environment_variables.description or "environment variables"
+        if self.name is None:
+            self.name = f"LaunchConfiguration-{self.identifier}"
         return KGLaunchConfiguration(
             name=self.name,
             description=self.description,

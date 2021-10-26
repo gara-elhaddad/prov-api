@@ -18,15 +18,21 @@ docstring goes here
    limitations under the License.
 """
 
+from os import environ, stat_result
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 import logging
+from itertools import chain
 
 
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
+
+import fairgraph.openminds.computation as omcmp
+
+from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import DataAnalysis, DataAnalysisPatch
 from ..common.data_models import HardwareSystem, Status
@@ -64,7 +70,13 @@ def query_analyses(
     The list may contain records of data analyses that are public, were performed by the logged-in user,
     or that are associated with a collab of which the user is a member.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    # todo: implement filters
+    # todo: query different spaces: "computation", "myspace", private collab spaces for which the user is a member
+    data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
+                                                    size=size, from_index=from_index,
+                                                    space="myspace")
+    return [obj.from_kg_object(kg_client) for obj in data_analysis_objects]
 
 
 @router.post("/analyses/", response_model=DataAnalysis, status_code=status.HTTP_201_CREATED)
@@ -72,7 +84,16 @@ def create_data_analysis(data_analysis: DataAnalysis, token: HTTPAuthorizationCr
     """
     Store a new record of a data analysis stage in the Knowledge Graph.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    if data_analysis.id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data included 'id' field. The POST endpoint cannot be used to modify an existing data analysis record.",
+        )
+    data_analysis.id == uuid4()
+    data_analysis_obj = data_analysis.to_kg_object(kg_client)
+    data_analysis_obj.save(kg_client, space="myspace", recursive=True)
+    return data_analysis_obj.from_kg_object(kg_client)
 
 
 @router.get("/analyses/{analysis_id}", response_model=DataAnalysis)
@@ -82,7 +103,9 @@ def get_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = D
 
     You may only retrieve public records, records that you created, or records associated with a collab which you can view.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
+    return DataAnalysis.from_kg_object(data_analysis_object, kg_client)
 
 
 @router.put("/analyses/{analysis_id}", response_model=DataAnalysis)

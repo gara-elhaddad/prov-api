@@ -54,7 +54,7 @@ class DataAnalysis(Computation):
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(obj)}")
         return cls(
-            id=dao.id,
+            id=client.uuid_from_uri(dao.id),
             input=inputs,
             output=[File.from_kg_object(obj, client) for obj in as_list(dao.outputs)],
             environment=ComputationalEnvironment.from_kg_object(dao.environment, client),
@@ -67,7 +67,7 @@ class DataAnalysis(Computation):
             tags=dao.tags
         )
 
-    def to_kg_objects(self, client):
+    def to_kg_object(self, client):
         if self.started_by:
             started_by = self.started_by.to_kg_object(client)
         else:
@@ -78,7 +78,8 @@ class DataAnalysis(Computation):
         launch_configuration = self.launch_config.to_kg_object(client)
         resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
         obj = KGDataAnalysis(
-            id=self.id,
+            id=client.uri_from_uuid(self.id),
+            lookup_label=f"Data analysis by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
             inputs=inputs,
             outputs=outputs,
             environment=environment,
@@ -91,7 +92,7 @@ class DataAnalysis(Computation):
             resource_usage=resource_usage,
             tags=self.tags
         )
-        return [obj, started_by, inputs, outputs, environment, launch_configuration, resource_usage]
+        return obj
 
 
 class DataAnalysisPatch(ComputationPatch):
