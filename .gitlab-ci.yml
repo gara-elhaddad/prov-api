@@ -1,0 +1,14 @@
+stages:
+  - build
+
+build_image:
+  stage: build
+  only:
+    refs:
+      - main
+  script:
+    - docker build -f deployment/Dockerfile -t docker-registry.ebrains.eu/prov-api/prov-api:latest .
+    - docker login -u $DOCKER_REGISTRY_USER -p $DOCKER_REGISTRY_SECRET docker-registry.ebrains.eu
+    - docker push docker-registry.ebrains.eu/prov-api/prov-api:latest
+  tags:
+    - shell-runner
