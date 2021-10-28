@@ -1,0 +1,24 @@
+name: Mirror to EBRAINS Gitlab
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  to_ebrains:
+    runs-on: ubuntu-latest
+    steps:
+      - name: syncmaster
+        uses: wei/git-sync@v3
+        with:
+          source_repo: "apdavison/prov-api"
+          source_branch: "main"
+          destination_repo: "https://ghpusher:${{ secrets.EBRAINS_GITLAB_ACCESS_TOKEN }}@gitlab.ebrains.eu/provenance/prov-api.git"
+          destination_branch: "main"
+      - name: synctags
+        uses: wei/git-sync@v3
+        with:
+          source_repo: "apdavison/prov-api"
+          source_branch: "refs/tags/*"
+          destination_repo: "https://ghpusher:${{ secrets.EBRAINS_GITLAB_ACCESS_TOKEN }}@gitlab.ebrains.eu/provenance/prov-api.git"
+          destination_branch: "refs/tags/*"
