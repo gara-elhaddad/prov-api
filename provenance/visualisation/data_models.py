@@ -20,22 +20,17 @@ docstring goes here
 
 
 import logging
-from uuid import UUID
-from typing import Union
-
-
-from pydantic import BaseModel
-
-from ..common.data_models import Computation, ComputationPatch
+from fairgraph.openminds.computation import Visualization as KGVisualization
+from ..dataanalysis.data_models import DataAnalysis, DataAnalysisPatch
 
 logger = logging.getLogger("ebrains-prov-api")
 
 
-class Visualisation(Computation):
-    """Record of a visualization of some data or model"""
+class Visualisation(DataAnalysis):
+    """Record of a visualisation"""
+    kg_cls = KGVisualization
 
-    pass
 
-
-class VisualisationPatch(ComputationPatch):
-    pass
+class VisualisationPatch(DataAnalysisPatch):
+    """Correction of or update to a record of a visualisation"""
+    kg_cls = KGVisualization

@@ -52,6 +52,7 @@ def query_analyses(
     input_data: UUID = Query(None, description="Return analyses of a given data file or directory containing data files"),
     software: UUID = Query(None, description="Return analyses that used a specific software version"),
     platform: HardwareSystem = Query(None, description="Return analyses that ran on this hardware platform"),
+    space: str = Query("myspace", description="Knowledge Graph space to search in"),
     status: Status = Query(None, description="Return analyses with this status"),
     tags: List[str] = Query(None, description="Return analyses with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),
@@ -75,12 +76,16 @@ def query_analyses(
     # todo: query different spaces: "computation", "myspace", private collab spaces for which the user is a member
     data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
                                                     size=size, from_index=from_index,
-                                                    space="myspace")
+                                                    space=space)
     return [obj.from_kg_object(kg_client) for obj in data_analysis_objects]
 
 
 @router.post("/analyses/", response_model=DataAnalysis, status_code=status.HTTP_201_CREATED)
-def create_data_analysis(data_analysis: DataAnalysis, token: HTTPAuthorizationCredentials = Depends(auth)):
+def create_data_analysis(
+    data_analysis: DataAnalysis,
+    space: str = "myspace",
+    token: HTTPAuthorizationCredentials = Depends(auth)
+):
     """
     Store a new record of a data analysis stage in the Knowledge Graph.
     """
@@ -92,7 +97,7 @@ def create_data_analysis(data_analysis: DataAnalysis, token: HTTPAuthorizationCr
         )
     data_analysis.id == uuid4()
     data_analysis_obj = data_analysis.to_kg_object(kg_client)
-    data_analysis_obj.save(kg_client, space="myspace", recursive=True)
+    data_analysis_obj.save(kg_client, space=space, recursive=True)
     return data_analysis_obj.from_kg_object(kg_client)
 
 

@@ -41,6 +41,7 @@ logger = logging.getLogger("ebrains-prov-api")
 
 class DataAnalysis(Computation):
     """Record of a data analysis"""
+    kg_cls = KGDataAnalysis
 
     @classmethod
     def from_kg_object(cls, data_analysis_object, client):
@@ -77,7 +78,7 @@ class DataAnalysis(Computation):
         environment = self.environment.to_kg_object(client)
         launch_configuration = self.launch_config.to_kg_object(client)
         resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
-        obj = KGDataAnalysis(
+        obj = self.__class__.kg_cls(
             id=client.uri_from_uuid(self.id),
             lookup_label=f"Data analysis by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
             inputs=inputs,

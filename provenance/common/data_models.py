@@ -242,6 +242,7 @@ class File(BaseModel):
             name=get_repository_name(self.location),
             repository_type=get_repository_type(self.location)
         )
+        # todo: if self.format is empty, we should try to infer it
         content_type = KGContentType(name=self.format.value)
         hash = KGHash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
         storage_size = QuantitativeValue(value=float(self.size), unit=UnitOfMeasurement(name="bytes"))
@@ -260,13 +261,16 @@ class File(BaseModel):
 class HardwareSystem(str, Enum):
     """Computer hardware system
 
-    "spinnaker":    the SpiNNaker 600 board machine at University of Manchester
-    "spinnaker4":   a SpiNNaker 4-chip board
-    "spinnaker48":  a SpiNNaker 48-chip board
-    "brainscales1": the BrainScaleS-1 system at Heidelberg University
-    "pizdaint":     Piz Daint (CSCS)
-    "jusuf":        JUSUF (JSC)
-    "galileo"       Galileo100 (CINECA)
+    "spinnaker":     the SpiNNaker 600 board machine at University of Manchester
+    "spinnaker4":    a SpiNNaker 4-chip board
+    "spinnaker48":   a SpiNNaker 48-chip board
+    "brainscales1":  the BrainScaleS-1 system at Heidelberg University
+    "pizdaint":      Piz Daint (CSCS)
+    "jusuf":         JUSUF (JSC)
+    "galileo"        Galileo100 (CINECA)
+    "openstack_cscs" OpenStack VMs at CSCS
+    "openstack_jsc"  OpenStack VMs at JSC
+
     """
 
     spinnaker = "spinnaker"  # the SpiNNaker 600 board machine at University of Manchester"
@@ -276,6 +280,8 @@ class HardwareSystem(str, Enum):
     pizdaint = "pizdaint"  # Piz Daint (CSCS)"
     jusuf = "jusuf"  # "JUSUF (JSC)"
     galileo100 = "galileo"  # Galileo100 (CINECA)"
+    openstack_cscs = "openstack_cscs"
+    openstack_jsc = "openstack_jsc"
 
 
 class StringParameter(BaseModel):
