@@ -74,8 +74,8 @@ class Status(str, Enum):
 class CryptographicHashFunction(str, Enum):
     """Algorithm used to compute digest of file contents"""
 
-    sha1 = "sha1"
-    md5 = "md5"
+    sha1 = "SHA-1"
+    md5 = "MD5"
     todo = "list to be completed"
 
 
@@ -85,6 +85,7 @@ class ContentType(str, Enum):
     pdf = "application/pdf"
     png = "image/png"
     json = "application/json"
+    python = "text/x-python"
     todo = "list to be completed"
 
 
