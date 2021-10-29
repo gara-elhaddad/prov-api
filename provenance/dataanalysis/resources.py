@@ -91,10 +91,12 @@ def create_data_analysis(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     if data_analysis.id is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data included 'id' field. The POST endpoint cannot be used to modify an existing data analysis record.",
-        )
+        data_analysis_object = omcmp.Visualisation.from_uuid(data_analysis.id, kg_client, scope="in progress")
+        if data_analysis_object is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A data analysis with id {data_analysis.id} already exists. The POST endpoint cannot be used to modify an existing data analysis record.",
+            )
     data_analysis.id == uuid4()
     data_analysis_obj = data_analysis.to_kg_object(kg_client)
     data_analysis_obj.save(kg_client, space=space, recursive=True)

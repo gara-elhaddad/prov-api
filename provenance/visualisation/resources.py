@@ -94,11 +94,13 @@ def create_visualisation(
     #for item in (launch_configuration, environment, *outputs, *inputs, started_by, visualisation_obj):
     #    item.save(kg_client, space="myspace")  # todo: support collab spaces. Save people to common?
     if visualisation.id is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Data included 'id' field. The POST endpoint cannot be used to modify an existing visualisation record.",
-        )
-    visualisation.id == uuid4()
+        visualisation_object = omcmp.Visualisation.from_uuid(visualisation.id, kg_client, scope="in progress")
+        if visualisation_object is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"A visualisation with id {visualisation.id} already exists. The POST endpoint cannot be used to modify an existing visualisation record.",
+            )
+
     visualisation_obj = visualisation.to_kg_object(kg_client)
     visualisation_obj.save(kg_client, space=space, recursive=True)
     return visualisation_obj.from_kg_object(kg_client)

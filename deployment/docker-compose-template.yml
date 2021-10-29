@@ -1,18 +1,16 @@
 version: '3'
 services:
   web:
-    build:
-      context: .
-      dockerfile: deployment/Dockerfile
+    image: docker-registry.ebrains.eu/prov-api/prov-api:latest
+    container_name: prov-api
     ports:
+      - "80:80"
       - "443:443"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt
     environment:
-      - KG_SERVICE_ACCOUNT_REFRESH_TOKEN=
-      - KG_SERVICE_ACCOUNT_CLIENT_ID=
-      - KG_SERVICE_ACCOUNT_SECRET=
-      - EBRAINS_IAM_CLIENT_ID=
+      - KG_CORE_API_HOST=core.kg-ppd.ebrains.eu
+      - EBRAINS_IAM_CLIENT_ID=prov-api
       - EBRAINS_IAM_SECRET=
       - SESSIONS_SECRET_KEY=
       - PROV_API_BASE_URL=https://prov.brainsimulation.eu
