@@ -91,7 +91,7 @@ def create_data_analysis(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     if data_analysis.id is not None:
-        data_analysis_object = omcmp.Visualisation.from_uuid(data_analysis.id, kg_client, scope="in progress")
+        data_analysis_object = omcmp.Visualisation.from_uuid(str(data_analysis.id), kg_client, scope="in progress")
         if data_analysis_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

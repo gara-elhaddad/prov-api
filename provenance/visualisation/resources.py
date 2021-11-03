@@ -94,7 +94,7 @@ def create_visualisation(
     #for item in (launch_configuration, environment, *outputs, *inputs, started_by, visualisation_obj):
     #    item.save(kg_client, space="myspace")  # todo: support collab spaces. Save people to common?
     if visualisation.id is not None:
-        visualisation_object = omcmp.Visualization.from_uuid(visualisation.id, kg_client, scope="in progress")
+        visualisation_object = omcmp.Visualization.from_uuid(str(visualisation.id), kg_client, scope="in progress")
         if visualisation_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

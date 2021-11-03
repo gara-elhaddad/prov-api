@@ -55,6 +55,7 @@ from fairgraph.openminds.computation import (
 )
 
 from .examples import EXAMPLES
+from ..auth.utils import get_kg_client_for_service_account
 
 
 KGFile.set_strict_mode(False, "is_part_of")
@@ -79,15 +80,23 @@ class CryptographicHashFunction(str, Enum):
     todo = "list to be completed"
 
 
-class ContentType(str, Enum):
-    """The content/media type of a file"""
+def get_identifier(iri):
+    """Return a valid Python variable name based on a KG object UUID"""
+    return "ct_" + iri.split("/")[-1].replace("-", "")
 
-    pdf = "application/pdf"
-    png = "image/png"
-    json = "application/json"
-    python = "text/x-python"
-    todo = "list to be completed"
 
+def _get_content_types():
+    kg_client_service_account = get_kg_client_for_service_account()
+    content_types = KGContentType.list(kg_client_service_account, scope="latest", space="controlled")
+    values = [(get_identifier(ct.id), ct.name) for ct in content_types]
+    values.append(("ct_python", "text/x-python"))  # temporary workaround for missing content type we need
+    return values
+
+
+ContentType = Enum(
+    "ContentType",
+    _get_content_types()
+)
 
 class Licence(str, Enum):
     """Software or document licence"""
@@ -189,25 +198,33 @@ def get_repository_host(url):
 
 
 def get_repository_iri(url):
-    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>\w+)\/(?P<path>\S*)"
+    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>[\w\.]+)\/(?P<path>\S*)"
     match = re.match(pattern, url)
     if match:
         return IRI(f"https://object.cscs.ch/v1/{match[0]}/{match[1]}")
-    raise NotImplementedError("Repository IRI format not yet supported")
+
+    if url.startswith("https://drive.ebrains.eu"):
+        return IRI("https://drive.ebrains.eu")
+    raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
 
 
 def get_repository_name(url):
-    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>\w+)\/(?P<path>\S*)"
+    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>[\w\.]+)\/(?P<path>\S*)"
     match = re.match(pattern, url)
     if match:
         return match[2]
-    raise NotImplementedError("Repository IRI format not yet supported")
+
+    if url.startswith("https://drive.ebrains.eu"):
+        return "EBRAINS Drive"
+    raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
 
 
 def get_repository_type(url):
     if url.startswith("https://object.cscs.ch"):
         return FileRepositoryType(name="Swift repository")
-    raise NotImplementedError("Repository IRI format not yet supported")
+    elif url.startswith("https://drive.ebrains.eu"):
+        return FileRepositoryType(name="Seafile repository")
+    raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
 
 
 class File(BaseModel):
@@ -243,10 +260,16 @@ class File(BaseModel):
             name=get_repository_name(self.location),
             repository_type=get_repository_type(self.location)
         )
-        # todo: if self.format is empty, we should try to infer it
-        content_type = KGContentType(name=self.format.value)
+        if self.format:
+            content_type = KGContentType(name=self.format.value)
+        else:
+            # todo: if self.format is empty, we should try to infer it
+            content_type = None
         hash = KGHash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
-        storage_size = QuantitativeValue(value=float(self.size), unit=UnitOfMeasurement(name="bytes"))
+        if self.size is None:
+            storage_size = None
+        else:
+            storage_size = QuantitativeValue(value=float(self.size), unit=UnitOfMeasurement(name="bytes"))
         file_obj = KGFile(
             file_repository=file_repository,
             format=content_type,
@@ -530,7 +553,7 @@ class LaunchConfiguration(BaseModel):
                     "name": self.name,
                     "executable": self.executable,
                     "arguments": self.arguments,
-                    "environment_variables": self.environment_variables.identifier
+                    "environment_variables": self.environment_variables.identifier if self.environment_variables else None
                 }
             ).encode("utf-8")).hexdigest()
 
@@ -546,7 +569,11 @@ class LaunchConfiguration(BaseModel):
         )
 
     def to_kg_object(self, client):
-        self.environment_variables.description = self.environment_variables.description or "environment variables"
+        if self.environment_variables is None:
+            env_vars = None
+        else:
+            self.environment_variables.description = self.environment_variables.description or "environment variables"
+            env_vars = self.environment_variables.to_kg_object(client)
         if self.name is None:
             self.name = f"LaunchConfiguration-{self.identifier}"
         return KGLaunchConfiguration(
@@ -554,7 +581,7 @@ class LaunchConfiguration(BaseModel):
             description=self.description,
             executable=self.executable,
             arguments=self.arguments,
-            environment_variables=self.environment_variables.to_kg_object(client)
+            environment_variables=env_vars
         )
 
 
