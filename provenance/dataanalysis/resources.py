@@ -24,6 +24,7 @@ from uuid import UUID, uuid4
 from datetime import datetime
 import logging
 from itertools import chain
+from fairgraph.openminds.computation.environment import Environment
 
 
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
@@ -35,7 +36,7 @@ import fairgraph.openminds.computation as omcmp
 from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import DataAnalysis, DataAnalysisPatch
-from ..common.data_models import HardwareSystem, Status
+from ..common.data_models import HardwareSystem, LaunchConfiguration, Status
 from .. import settings
 
 

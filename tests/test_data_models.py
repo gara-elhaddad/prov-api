@@ -11,15 +11,40 @@ from pydantic import parse_obj_as
 
 sys.path.append(".")
 from provenance.dataanalysis.data_models import DataAnalysis
-from provenance.dataanalysis.examples import EXAMPLES
+from provenance.visualisation.data_models import Visualisation
+import provenance.dataanalysis.examples
+import provenance.visualisation.examples
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
 from fairgraph.base_v3 import IRI
 
 
+EXAMPLES = provenance.dataanalysis.examples.EXAMPLES
+EXAMPLES.update(provenance.visualisation.examples.EXAMPLES)
+
+ID_PREFIX = "https://kg.ebrains.eu/api/instances"
+
+
 class MockKGClient:
-    pass
+
+    def user_info(self):
+        return {
+            "http://schema.org/familyName": "Holmes",
+            "http://schema.org/givenName": "Sherlock"
+        }
+
+    def list(self, cls, space=None, from_index=0, size=100, api="core", scope="released",
+             resolved=False, filter=None):
+        if cls == omcore.Person:
+            return [omcore.Person(given_name="Sherlock", family_name="Holmes")]
+        return None
+
+    def uri_from_uuid(self, uuid):
+        return f"{ID_PREFIX}/{uuid}"
+
+    def uuid_from_uri(self, uri):
+        return uri.split("/")[-1]
 
 
 class TestDataAnalysis:
@@ -27,8 +52,8 @@ class TestDataAnalysis:
     def test_conversion_to_kg_objects(self):
         #pydantic_obj = DataAnalysis(**EXAMPLES["DataAnalysis"])
         pydantic_obj = parse_obj_as(DataAnalysis, EXAMPLES["DataAnalysis"])
-        kg_client = None
-        kg_objects = pydantic_obj.to_kg_objects(kg_client)
+        kg_client = MockKGClient()
+        kg_objects = pydantic_obj.to_kg_object(kg_client)
 
     def test_conversion_from_kg_objects(self):
         omcore.SoftwareVersion.set_strict_mode(False)
@@ -38,12 +63,12 @@ class TestDataAnalysis:
             family_name="Destexhe",
             given_name="Alain",
             digital_identifiers=[omcore.ORCID(identifier="https://orcid.org/0000-0001-7405-0455")],
-            id=UUID("{00000000-0000-0000-0000-000000000000}")
+            id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"
         )
         inputs = [
             omcore.File(
                 content="Demonstration data for validation framework",
-                format=omcore.ContentType(name="application/json", id=UUID("{00000000-0000-0000-0000-000000000000}")),
+                format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
                 hash=omcore.Hash(algorithm="sha1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
                 iri=IRI("https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json"),
                 name="InputResistance_data.json",
@@ -52,11 +77,12 @@ class TestDataAnalysis:
             omcore.SoftwareVersion(
                 name="Elephant",
                 version_identifier="0.10.0",
-                id=UUID("{00000000-0000-0000-0000-000000000000}")
+                id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"
             )
         ]
         outputs = [deepcopy(inputs[0])]
         environment = omcmp.Environment(
+            id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000",
             name="SpiNNaker default 2021-10-13",
             hardware=omcmp.HardwareSystem(name="spinnaker"),
             configuration=omcore.ParameterSet(
@@ -67,9 +93,9 @@ class TestDataAnalysis:
                     context="hardware configuration for SpiNNaker 1M core machine"
             ),
             software=[
-                omcore.SoftwareVersion(name="numpy", version_identifier="1.19.3", id=UUID("{00000000-0000-0000-0000-000000000000}")),
-                omcore.SoftwareVersion(name="neo", version_identifier="0.9.0", id=UUID("{00000000-0000-0000-0000-000000000000}")),
-                omcore.SoftwareVersion(name="spyNNaker", version_identifier="5.0.0", id=UUID("{00000000-0000-0000-0000-000000000000}"))
+                omcore.SoftwareVersion(name="numpy", version_identifier="1.19.3", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
+                omcore.SoftwareVersion(name="neo", version_identifier="0.9.0", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
+                omcore.SoftwareVersion(name="spyNNaker", version_identifier="5.0.0", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000")
             ],
             description="Default environment on SpiNNaker 1M core machine as of 2020-10-13 (not really, this is just for example purposes)."
 
@@ -83,7 +109,7 @@ class TestDataAnalysis:
         )
         resource_usage = [omcore.QuantitativeValue(value=1017.3, unit=omterms.UnitOfMeasurement(name="core-hours"))]
         data_analysis = omcmp.DataAnalysis(
-            id=UUID("{00000000-0000-0000-0000-000000000000}"),
+            id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000",
             inputs=inputs,
             outputs=outputs,
             environment=environment,
@@ -100,6 +126,7 @@ class TestDataAnalysis:
         pydantic_obj = DataAnalysis.from_kg_object(data_analysis, client)
 
         # remove IDs added by from_kg_object() for the comparison
+        pydantic_obj.environment.id = None
         for item in pydantic_obj.environment.software:
             item.id = None
         pydantic_obj.input[1].id = None
@@ -109,3 +136,11 @@ class TestDataAnalysis:
 
         diff = jsondiff.diff(actual, expected, load=True, syntax="explicit")
         assert len(diff) == 0
+
+
+class TestVisualisation:
+
+    def test_conversion_to_kg_objects(self):
+        pydantic_obj = parse_obj_as(Visualisation, EXAMPLES["Visualisation"])
+        kg_client = MockKGClient()
+        kg_objects = pydantic_obj.to_kg_object(kg_client)

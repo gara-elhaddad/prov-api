@@ -7,7 +7,7 @@ EXAMPLES = {
                 "description": "Demonstration data for validation framework",
                 "format": "application/json",
                 "hash": {
-                    "algorithm": "sha1",
+                    "algorithm": "SHA-1",
                     "value": "716c29320b1e329196ce15d904f7d4e3c7c46685"
                 },
                 "location": "https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json",
@@ -24,7 +24,7 @@ EXAMPLES = {
                 "description": "Demonstration data for validation framework",
                 "format": "application/json",
                 "hash": {
-                    "algorithm": "sha1",
+                    "algorithm": "SHA-1",
                     "value": "716c29320b1e329196ce15d904f7d4e3c7c46685"
                 },
                 "location": "https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json",
