@@ -90,7 +90,7 @@ class DataAnalysis(Computation):
             started_by=started_by,
             #was_informed_by= # todo
             status=ActionStatusType(name=self.status.value),
-            resource_usage=resource_usage,
+            resource_usages=resource_usage,
             tags=self.tags
         )
         return obj
