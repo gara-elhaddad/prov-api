@@ -10,6 +10,7 @@ import jsondiff
 from pydantic import parse_obj_as
 
 sys.path.append(".")
+from provenance.common.data_models import get_repository_iri
 from provenance.dataanalysis.data_models import DataAnalysis
 from provenance.visualisation.data_models import Visualisation
 import provenance.dataanalysis.examples
@@ -46,6 +47,13 @@ class MockKGClient:
     def uuid_from_uri(self, uri):
         return uri.split("/")[-1]
 
+
+class TestCommon:
+
+    def test_get_repository_iri(self):
+        file_iri = "https://object.cscs.ch/v1/AUTH_63ea6845b1d34ad7a43c8158d9572867/Freund_SGA1_T1.2.5/HC-awake-ephys/HBP_1/cell1/ephys/Freund_SGA1_T1.2.5_HC-awake-ephys_HBP_1_cell1_ephys__160712_cell1.smr"
+        repo_iri = str(get_repository_iri(file_iri))
+        assert repo_iri == "https://object.cscs.ch/v1/AUTH_63ea6845b1d34ad7a43c8158d9572867/Freund_SGA1_T1.2.5"
 
 class TestDataAnalysis:
 

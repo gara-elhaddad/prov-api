@@ -205,11 +205,14 @@ def get_repository_host(url):
     return None
 
 
+CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.]+)/(?P<path>\S*)"
+
+
 def get_repository_iri(url):
-    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>[\w\.]+)\/(?P<path>\S*)"
+    pattern = CSCS_pattern
     match = re.match(pattern, url)
     if match:
-        return IRI(f"https://object.cscs.ch/v1/{match[0]}/{match[1]}")
+        return IRI(f"https://object.cscs.ch/v1/{match['proj']}/{match['container_name']}")
 
     if url.startswith("https://drive.ebrains.eu"):
         return IRI("https://drive.ebrains.eu")
@@ -217,10 +220,10 @@ def get_repository_iri(url):
 
 
 def get_repository_name(url):
-    pattern = "https:\/\/object\.cscs\.ch\/v1\/(?P<proj>\w+)\/(?P<container_name>[\w\.]+)\/(?P<path>\S*)"
+    pattern = CSCS_pattern
     match = re.match(pattern, url)
     if match:
-        return match[2]
+        return match["container_name"]
 
     if url.startswith("https://drive.ebrains.eu"):
         return "EBRAINS Drive"
