@@ -85,6 +85,14 @@ def get_identifier(iri):
     return "ct_" + iri.split("/")[-1].replace("-", "")
 
 
+def _get_units_of_measurement():
+    kg_client_service_account = get_kg_client_for_service_account()
+    units = UnitOfMeasurement.list(kg_client_service_account, scope="latest", space="controlled")
+    return {u.name: u for u in units}
+
+UNITS = _get_units_of_measurement()  # pre-fetch units of measurement
+
+
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
     content_types = KGContentType.list(kg_client_service_account, scope="latest", space="controlled")
@@ -269,7 +277,7 @@ class File(BaseModel):
         if self.size is None:
             storage_size = None
         else:
-            storage_size = QuantitativeValue(value=float(self.size), unit=UnitOfMeasurement(name="bytes"))
+            storage_size = QuantitativeValue(value=float(self.size), unit=UNITS["byte"])
         file_obj = KGFile(
             file_repository=file_repository,
             format=content_type,
@@ -363,7 +371,7 @@ class NumericalParameter(BaseModel):
     def to_kg_object(self, client):
         return KGNumericalParameter(
             name=self.name,
-            values=QuantitativeValue(value=self.value, units=UnitOfMeasurement(name=self.units))
+            values=QuantitativeValue(value=self.value, units=UNITS[self.units])
         )
 
 
@@ -457,7 +465,7 @@ class ResourceUsage(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return QuantitativeValue(value=float(self.value), unit=UnitOfMeasurement(name=self.units))
+        return QuantitativeValue(value=float(self.value), unit=UNITS[self.units])
 
 
 class SoftwareVersion(BaseModel):

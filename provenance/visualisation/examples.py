@@ -91,7 +91,7 @@ EXAMPLES = {
         "resource_usage": [
             {
                 "value": 5.422412,
-                "units": "seconds"
+                "units": "second"
             }
         ],
         "tags": [
