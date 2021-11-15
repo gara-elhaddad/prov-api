@@ -103,7 +103,7 @@ def create_visualisation(
 
     visualisation_obj = visualisation.to_kg_object(kg_client)
     visualisation_obj.save(kg_client, space=space, recursive=True)
-    return visualisation_obj.from_kg_object(kg_client)
+    return Visualisation.from_kg_object(visualisation_obj, kg_client)
 
 
 @router.get("/visualisations/{visualisation_id}", response_model=Visualisation)

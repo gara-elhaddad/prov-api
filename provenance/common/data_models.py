@@ -468,6 +468,7 @@ class ResourceUsage(BaseModel):
         )
 
     def to_kg_object(self, client):
+        # todo: wrap getting units in a function which will produce a meaningful HTTP error message if the unit doesn't exist
         return QuantitativeValue(value=float(self.value), unit=UNITS[self.units])
 
 
