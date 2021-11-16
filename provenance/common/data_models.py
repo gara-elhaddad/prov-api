@@ -255,12 +255,34 @@ class File(BaseModel):
 
     @classmethod
     def from_kg_object(cls, file_object, client):
+        if isinstance(file_object, KGProxy):
+            file_object = file_object.resolve(client, scope="in progress")
+        if file_object.format:
+            name = file_object.format.resolve(client, scope="in progress").name
+            format = [ct for ct in ContentType if ct.value == name][0]
+        else:
+            format = None
+        if file_object.hash:
+            def get_algorithm(name):
+                for item in list(CryptographicHashFunction):
+                    if item.value == name:
+                        return item
+            if isinstance(file_object.hash, list):
+                hash = Digest(value=file_object.hash[0].digest, algorithm=get_algorithm(file_object.hash[0].algorithm))
+            else:
+                hash = Digest(value=file_object.hash.digest, algorithm=get_algorithm(file_object.hash.algorithm))
+        else:
+            hash = None
+        if file_object.storage_size:
+            size = int(file_object.storage_size.value)
+        else:
+            size = None
         return cls(
-            format=[ct for ct in ContentType if ct.value == file_object.format.resolve(client).name][0],
-            hash=Digest(value=file_object.hash.digest, algorithm=CryptographicHashFunction.sha1),
+            format=format,
+            hash=hash,
             location=file_object.iri.value,
             file_name=file_object.name,
-            size=int(file_object.storage_size.value),
+            size=size,
             description=file_object.content
         )
 
@@ -431,11 +453,16 @@ class Person(BaseModel):
 
     @classmethod
     def from_kg_object(cls, person, client):
-        person = person.resolve(client)
+        person = person.resolve(client, scope="in progress")
+        orcid = None
         if person.digital_identifiers:
-            orcid = person.digital_identifiers[0].resolve(client).identifier
-        else:
-            orcid = None
+            for digid in as_list(person.digital_identifiers):
+                if isinstance(digid, ORCID):
+                    orcid = digid.identifier
+                    break
+                elif isinstance(digid, KGProxy) and digid.cls == ORCID:
+                    orcid = digid.resolve(client, scope="in progress").identifier
+                    break
         return cls(given_name=person.given_name, family_name=person.family_name,
                    orcid=orcid)
 
@@ -464,7 +491,7 @@ class ResourceUsage(BaseModel):
     def from_kg_object(cls, resource_usage, client):
         return cls(
             value=resource_usage.value,
-            units=resource_usage.unit.resolve(client).name
+            units=resource_usage.unit.resolve(client, scope="in progress").name
         )
 
     def to_kg_object(self, client):
@@ -489,7 +516,9 @@ class SoftwareVersion(BaseModel):
 
     @classmethod
     def from_kg_object(cls, software_version_object, client):
-        svo = software_version_object.resolve(client)
+        KGSoftwareVersion.set_strict_mode(False)
+        svo = software_version_object.resolve(client, scope="in progress")
+        KGSoftwareVersion.set_strict_mode(True)
         return cls(
             id=client.uuid_from_uri(svo.id),
             software_name=svo.name,
@@ -523,11 +552,11 @@ class ComputationalEnvironment(BaseModel):
 
     @classmethod
     def from_kg_object(cls, env_object, client):
-        env = env_object.resolve(client)
+        env = env_object.resolve(client, scope="in progress")
         return cls(
             id=client.uuid_from_uri(env.id),
             name=env.name,
-            hardware=getattr(HardwareSystem, env.hardware.resolve(client).name),
+            hardware=getattr(HardwareSystem, env.hardware.resolve(client, scope="in progress").name),
             configuration=[ParameterSet.from_kg_object(obj, client) for obj in as_list(env.configuration)],
             software=[SoftwareVersion.from_kg_object(obj, client) for obj in as_list(env.software)],
             description=env.description
@@ -571,13 +600,17 @@ class LaunchConfiguration(BaseModel):
 
     @classmethod
     def from_kg_object(cls, launch_config_object, client):
-        lco = launch_config_object.resolve(client)
+        lco = launch_config_object.resolve(client, scope="in progress")
+        if lco.environment_variables:
+            env = ParameterSet.from_kg_object(lco.environment_variables, client)
+        else:
+            env = None
         return cls(
             description=lco.description,
             name=lco.name,
             executable=lco.executable,
             arguments=lco.arguments,
-            environment_variables=ParameterSet.from_kg_object(lco.environment_variables, client)
+            environment_variables=env
         )
 
     def to_kg_object(self, client):

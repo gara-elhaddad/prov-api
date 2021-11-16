@@ -21,6 +21,7 @@ docstring goes here
 
 import logging
 from uuid import UUID
+from fairgraph.base_v3 import KGProxyV3
 from fairgraph.utility import as_list
 
 from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis
@@ -48,6 +49,8 @@ class DataAnalysis(Computation):
         dao = data_analysis_object.resolve(client)
         inputs = []
         for obj in as_list(dao.inputs):
+            if isinstance(obj, KGProxyV3):
+                obj = obj.resolve(client, scope="in progress")
             if isinstance(obj, KGFile):
                 inputs.append(File.from_kg_object(obj, client))
             elif isinstance(obj, KGSoftwareVersion):
