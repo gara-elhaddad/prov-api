@@ -72,7 +72,9 @@ async def get_collab_info(collab_id, user_token):
     return response
 
 
-async def get_collab_permissions_v2(collab_id, user_token):
+async def get_collab_permissions(collab_id, user_token):
+    if collab_id.startswith("collab-"):
+        collab_id = collab_id[7:]
     user_info = get_user_from_token(user_token)
     target_team_names = {role: f"collab-{collab_id}-{role}"
                          for role in ("viewer", "editor", "administrator")}
@@ -82,16 +84,18 @@ async def get_collab_permissions_v2(collab_id, user_token):
         if team_name in user_info["roles"]["team"]:
             highest_collab_role = role
     if highest_collab_role == "viewer":
-        permissions = {"VIEW": True, "UPDATE": False}
-    elif highest_collab_role in ("editor", "administrator"):
-        permissions = {"VIEW": True, "UPDATE": True}
+        permissions = {"VIEW": True, "UPDATE": False, "DELETE": False}
+    elif highest_collab_role == "editor":
+        permissions = {"VIEW": True, "UPDATE": True, "DELETE": False}
+    elif highest_collab_role == "administrator":
+        permissions = {"VIEW": True, "UPDATE": True, "DELETE": True}
     else:
         assert highest_collab_role is None
         collab_info = await get_collab_info(collab_id, user_token)
         if collab_info.get("isPublic", False):  # will be False if 404 collab not found
-            permissions = {"VIEW": True, "UPDATE": False}
+            permissions = {"VIEW": True, "UPDATE": False, "DELETE": False}
         else:
-            permissions = {"VIEW": False, "UPDATE": False}
+            permissions = {"VIEW": False, "UPDATE": False, "DELETE": False}
     return permissions
 
 
@@ -101,14 +105,25 @@ async def is_collab_member(collab_id, user_token):
     try:
         int(collab_id)
     except ValueError:
-        get_collab_permissions = get_collab_permissions_v2
         permissions = await get_collab_permissions(collab_id, user_token)
         return permissions.get("UPDATE", False)
     else:
         return False
 
 
-async def is_admin(user_token):
+async def is_collab_admin(collab_id, user_token):
+    if collab_id is None:
+        return False
+    try:
+        int(collab_id)
+    except ValueError:
+        permissions = await get_collab_permissions(collab_id, user_token)
+        return permissions.get("DELETE", False)
+    else:
+        return False
+
+
+async def is_global_admin(user_token):
     user_info = get_user_from_token(user_token)
     return f"group-{settings.ADMIN_GROUP_ID}" in user_info["groups"]
 
