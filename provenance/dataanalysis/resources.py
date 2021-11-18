@@ -33,7 +33,7 @@ from pydantic import ValidationError
 
 import fairgraph.openminds.computation as omcmp
 
-from ..auth.utils import get_kg_client_for_user_account
+from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
 
 from .data_models import DataAnalysis, DataAnalysisPatch
 from ..common.data_models import HardwareSystem, LaunchConfiguration, Status
@@ -96,12 +96,13 @@ def create_data_analysis(
         if data_analysis_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A data analysis with id {data_analysis.id} already exists. The POST endpoint cannot be used to modify an existing data analysis record.",
+                detail=f"A data analysis with id {data_analysis.id} already exists. "
+                        "The POST endpoint cannot be used to modify an existing data analysis record.",
             )
     data_analysis.id == uuid4()
     data_analysis_obj = data_analysis.to_kg_object(kg_client)
     data_analysis_obj.save(kg_client, space=space, recursive=True)
-    return data_analysis_obj.from_kg_object(kg_client)
+    return DataAnalysis.from_kg_object(data_analysis_obj, kg_client)
 
 
 @router.get("/analyses/{analysis_id}", response_model=DataAnalysis)
@@ -109,7 +110,8 @@ def get_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = D
     """
     Retrieve a specific data analysis record, identified by its ID.
 
-    You may only retrieve public records, records that you created, or records associated with a collab which you can view.
+    You may only retrieve public records, records in your private space,
+    or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
@@ -125,11 +127,26 @@ def replace_data_analysis(
     """
     Replace a data analysis record in its entirety.
 
-    You may only replace records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only replace records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
+    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space)):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only replace provenance records in your private space "
+                   "or in collab spaces for which you are an administrator."
+        )
+    if data_analysis.id is not None and data_analysis.id != analysis_id:
+        raise HTTPException(
+            status_code=400,
+            detail="The ID of the payload does not match the URL"
+        )
+    data_analysis_obj_new = data_analysis.to_kg_object(kg_client)
+    data_analysis_obj_new.id = data_analysis_object.id
+    data_analysis_obj_new.save(kg_client, space=data_analysis_object.space, recursive=True, replace=True)
+    return DataAnalysis.from_kg_object(data_analysis_obj_new, kg_client)
 
 
 @router.patch("/analyses/{analysis_id}", response_model=DataAnalysis)
@@ -141,18 +158,41 @@ def update_data_analysis(
     """
     Modify part of the metadata in a data analysis record.
 
-    You may only update records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only update records records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
+    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space)):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only modify provenance records in your private space "
+                   "or in collab spaces for which you are an administrator."
+        )
+    if patch.id is not None and patch.id != analysis_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Modifying the record ID is not permitted."
+        )
+    data_analysis_obj_updated = patch.apply_to_kg_object(data_analysis_object, kg_client)
+    data_analysis_obj_updated.save(kg_client, space=data_analysis_object.space, recursive=True)
+    return DataAnalysis.from_kg_object(data_analysis_obj_updated, kg_client)
 
 
-@router.delete("/analyses/{analysis_id}", response_model=DataAnalysis)
+@router.delete("/analyses/{analysis_id}")
 def delete_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Delete a data analysis record.
 
-    You may only delete records that you created, or that are associated with a collab of which you are an administrator.
+    You may only delete records records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
+    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space)):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only delete provenance records in your private space "
+                   "or in collab spaces for which you are an administrator."
+        )
+    data_analysis_object.delete(kg_client)
