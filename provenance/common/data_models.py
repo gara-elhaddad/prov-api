@@ -45,7 +45,8 @@ from fairgraph.openminds.core import (
     Person as KGPerson, ORCID, File as KGFile, Organization as KGOrganization,
     FileRepository as KGFileRepository, Hash as KGHash, ContentType as KGContentType,
     SoftwareVersion as KGSoftwareVersion, ParameterSet as KGParameterSet,
-    StringParameter as KGStringParameter, NumericalParameter as KGNumericalParameter
+    StringParameter as KGStringParameter, NumericalParameter as KGNumericalParameter,
+    ModelVersion as KGModelVersion
 )
 from fairgraph.openminds.controlledterms import FileRepositoryType, UnitOfMeasurement
 from fairgraph.openminds.computation import (
@@ -682,4 +683,11 @@ class ModelVersionReference(BaseModel):
     information about the model version using its ID.
     """
 
-    model_version_id: UUID = None
+    model_version_id: UUID
+
+    @classmethod
+    def from_kg_object(cls, model_version, client):
+        return UUID(model_version.uuid)
+
+    def to_kg_object(self, client):
+        return KGModelVersion.from_uuid(str(self.model_version_id), client, scope="in progress")

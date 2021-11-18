@@ -15,7 +15,9 @@ sys.path.append(".")
 from provenance.common.data_models import ResourceUsage, get_repository_iri
 from provenance.dataanalysis.data_models import DataAnalysis
 from provenance.visualisation.data_models import Visualisation
+from provenance.simulation.data_models import Simulation
 import provenance.common.examples
+import provenance.simulation.examples
 import provenance.dataanalysis.examples
 import provenance.visualisation.examples
 import fairgraph.openminds.core as omcore
@@ -27,6 +29,7 @@ from fairgraph.base_v3 import IRI
 EXAMPLES = provenance.common.examples.EXAMPLES
 EXAMPLES.update(provenance.dataanalysis.examples.EXAMPLES)
 EXAMPLES.update(provenance.visualisation.examples.EXAMPLES)
+EXAMPLES.update(provenance.simulation.examples.EXAMPLES)
 
 ID_PREFIX = "https://kg.ebrains.eu/api/instances"
 
@@ -50,6 +53,30 @@ class MockKGClient:
 
     def uuid_from_uri(self, uri):
         return uri.split("/")[-1]
+
+    def instance_from_full_uri(self, uri, use_cache=True, scope="released", resolved=False):
+        objects = {
+            "kg:3fa85f64-5717-4562-b3fc-2c963f66afa6": {
+                "@id": "kg:3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                "@type": ["https://openminds.ebrains.eu/core/ModelVersion"],
+                "@context": {"vocab": "https://openminds.ebrains.eu/vocab/", "kg": "https://kg.ebrains.eu/api/instances/"},
+                'vocab:format': {'@id': "kg:47fd24aa-69c5-4e42-a6ca-a6ade6595a14",
+                                 '@type': ['https://openminds.ebrains.eu/core/ContentType']},
+                'vocab:license': {'@id': "kg:c47bf382-d44b-4a2d-98a3-40ca18e6911d",
+                                  '@type': ['https://openminds.ebrains.eu/core/License']},
+                'vocab:accessibility': {'@id': "kg:b2ff7a47-b349-48d7-8ce4-cf51868675f1",
+                                        '@type': ['https://openminds.ebrains.eu/controlledTerms/ProductAccessibility']},
+                'vocab:fullDocumentation': {'@id': 'http://example.com',
+                                            '@type': ['https://openminds.ebrains.eu/core/URL']},
+                'vocab:fullName': 'fake model for testing',
+                'vocab:releaseDate': '1999-12-31T23:59:59',
+                'vocab:shortName': 'fake-model-for-testing',
+                'vocab:versionIdentifier': '1.0',
+                'vocab:versionInnovation': 'new stuff'
+            }
+        }
+        compacted_uri = compact_uri(uri, {"kg": "https://kg.ebrains.eu/api/instances/"})
+        return objects.get(compacted_uri, None)
 
 
 class TestCommon:
@@ -164,5 +191,13 @@ class TestVisualisation:
 
     def test_conversion_to_kg_objects(self):
         pydantic_obj = parse_obj_as(Visualisation, EXAMPLES["Visualisation"])
+        kg_client = MockKGClient()
+        kg_objects = pydantic_obj.to_kg_object(kg_client)
+
+
+class TestSimulation:
+
+    def test_conversion_to_kg_objects(self):
+        pydantic_obj = parse_obj_as(Simulation, EXAMPLES["Simulation"])
         kg_client = MockKGClient()
         kg_objects = pydantic_obj.to_kg_object(kg_client)
