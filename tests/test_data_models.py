@@ -4,15 +4,18 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from uuid import UUID
 import json
+from fairgraph.utility import compact_uri
+from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
 
 import jsondiff
 
 from pydantic import parse_obj_as
 
 sys.path.append(".")
-from provenance.common.data_models import get_repository_iri
+from provenance.common.data_models import ResourceUsage, get_repository_iri
 from provenance.dataanalysis.data_models import DataAnalysis
 from provenance.visualisation.data_models import Visualisation
+import provenance.common.examples
 import provenance.dataanalysis.examples
 import provenance.visualisation.examples
 import fairgraph.openminds.core as omcore
@@ -21,7 +24,8 @@ import fairgraph.openminds.computation as omcmp
 from fairgraph.base_v3 import IRI
 
 
-EXAMPLES = provenance.dataanalysis.examples.EXAMPLES
+EXAMPLES = provenance.common.examples.EXAMPLES
+EXAMPLES.update(provenance.dataanalysis.examples.EXAMPLES)
 EXAMPLES.update(provenance.visualisation.examples.EXAMPLES)
 
 ID_PREFIX = "https://kg.ebrains.eu/api/instances"
@@ -55,6 +59,16 @@ class TestCommon:
         repo_iri = str(get_repository_iri(file_iri))
         assert repo_iri == "https://object.cscs.ch/v1/AUTH_63ea6845b1d34ad7a43c8158d9572867/Freund_SGA1_T1.2.5"
 
+    def test_resource_usage(self):
+        pydantic_obj = parse_obj_as(ResourceUsage, EXAMPLES["ResourceUsage"])
+        kg_client = MockKGClient()
+        kg_object = pydantic_obj.to_kg_object(kg_client)
+        assert isinstance(kg_object, QuantitativeValue)
+
+    def test_numerical_parameter(self):
+        pass
+
+
 class TestDataAnalysis:
 
     def test_conversion_to_kg_objects(self):
@@ -77,7 +91,7 @@ class TestDataAnalysis:
             omcore.File(
                 content="Demonstration data for validation framework",
                 format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
-                hash=omcore.Hash(algorithm="sha1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
+                hash=omcore.Hash(algorithm="SHA-1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
                 iri=IRI("https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json"),
                 name="InputResistance_data.json",
                 storage_size=omcore.QuantitativeValue(value=34.0, units=omterms.UnitOfMeasurement(name="byte"))
@@ -115,7 +129,7 @@ class TestDataAnalysis:
                 parameters=[omcore.StringParameter(name= "COLLAB_ID", value= "myspace")]
             )
         )
-        resource_usage = [omcore.QuantitativeValue(value=1017.3, unit=omterms.UnitOfMeasurement(name="core-hours"))]
+        resource_usage = [omcore.QuantitativeValue(value=1017.3, unit=omterms.UnitOfMeasurement(name="core-hour"))]
         data_analysis = omcmp.DataAnalysis(
             id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000",
             inputs=inputs,

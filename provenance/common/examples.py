@@ -56,4 +56,8 @@ EXAMPLES = {
             }]
         }
     },
+    "ResourceUsage": {
+        "value": 1017.3,
+        "units": "second"
+    }
 }

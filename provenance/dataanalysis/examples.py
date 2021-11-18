@@ -91,7 +91,7 @@ EXAMPLES = {
         "resource_usage": [
             {
                 "value": 1017.3,
-                "units": "core-hours"
+                "units": "core-hour"
             }
         ],
         "tags": [

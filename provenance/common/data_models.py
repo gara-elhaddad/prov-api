@@ -80,23 +80,33 @@ class CryptographicHashFunction(str, Enum):
     todo = "list to be completed"
 
 
-def get_identifier(iri):
+def get_identifier(iri, prefix):
     """Return a valid Python variable name based on a KG object UUID"""
-    return "ct_" + iri.split("/")[-1].replace("-", "")
+    return prefix + "_" + iri.split("/")[-1].replace("-", "")
 
 
 def _get_units_of_measurement():
+    # pre-fetch units of measurement
     kg_client_service_account = get_kg_client_for_service_account()
-    units = UnitOfMeasurement.list(kg_client_service_account, scope="latest", space="controlled")
-    return {u.name: u for u in units}
+    units_objects = UnitOfMeasurement.list(kg_client_service_account, scope="latest", space="controlled")
+    # the follow addition is a temporary workaround with a locally-generated id until core-hour is added
+    units_objects.append(UnitOfMeasurement(name="core-hour", id="https://kg.ebrains.eu/api/instances/686f4d65-bdc7-4f69-bf32-4c9f09028541"))
+    return units_objects
 
-UNITS = _get_units_of_measurement()  # pre-fetch units of measurement
+UNITS = _get_units_of_measurement()
+
+Units = Enum(
+    "Units",
+    [(get_identifier(unit.id, "u"), unit.name) for unit in UNITS]
+)
+
+UNITS = {u: unit_obj for u, unit_obj in zip(Units, UNITS)}
 
 
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
     content_types = KGContentType.list(kg_client_service_account, scope="latest", space="controlled")
-    values = [(get_identifier(ct.id), ct.name) for ct in content_types]
+    values = [(get_identifier(ct.id, "ct"), ct.name) for ct in content_types]
     values.append(("ct_python", "text/x-python"))  # temporary workaround for missing content type we need
     return values
 
@@ -259,14 +269,12 @@ class File(BaseModel):
             file_object = file_object.resolve(client, scope="in progress")
         if file_object.format:
             name = file_object.format.resolve(client, scope="in progress").name
-            format = [ct for ct in ContentType if ct.value == name][0]
+            format = ContentType(name)
         else:
             format = None
         if file_object.hash:
             def get_algorithm(name):
-                for item in list(CryptographicHashFunction):
-                    if item.value == name:
-                        return item
+                return CryptographicHashFunction(name)
             if isinstance(file_object.hash, list):
                 hash = Digest(value=file_object.hash[0].digest, algorithm=get_algorithm(file_object.hash[0].algorithm))
             else:
@@ -302,7 +310,7 @@ class File(BaseModel):
         if self.size is None:
             storage_size = None
         else:
-            storage_size = QuantitativeValue(value=float(self.size), unit=UNITS["byte"])
+            storage_size = QuantitativeValue(value=float(self.size), unit=UNITS[Units("byte")])
         file_obj = KGFile(
             file_repository=file_repository,
             format=content_type,
@@ -371,7 +379,7 @@ class NumericalParameter(BaseModel):
 
     name: str
     value: Decimal
-    units: str = None
+    units: Units = None
 
     class Config:
         schema_extra = {
@@ -390,7 +398,7 @@ class NumericalParameter(BaseModel):
         return cls(
             name=param.name,
             value=param.values[0].value,
-            units=param.values[0].units
+            units=Units(param.values[0].units)
         )
 
     def to_kg_object(self, client):
@@ -477,13 +485,13 @@ class ResourceUsage(BaseModel):
     """Measurement of the usage of some resource, such as memory, compute time"""
 
     value: Decimal
-    units: str
+    units: Units
 
     class Config:
         schema_extra = {
             "example": {
                 "value": 1017.3,
-                "units": "core-hours"
+                "units": "core-hour"
             }
         }
 
@@ -491,7 +499,7 @@ class ResourceUsage(BaseModel):
     def from_kg_object(cls, resource_usage, client):
         return cls(
             value=resource_usage.value,
-            units=resource_usage.unit.resolve(client, scope="in progress").name
+            units=Units(resource_usage.unit.resolve(client, scope="in progress").name)
         )
 
     def to_kg_object(self, client):
