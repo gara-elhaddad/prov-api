@@ -68,7 +68,7 @@ class DataAnalysis(Computation):
             started_by=Person.from_kg_object(obj.started_by, client),
             status=getattr(Status, obj.status.resolve(client).name),
             resource_usage=[ResourceUsage.from_kg_object(ru, client) for ru in as_list(obj.resource_usages)],
-            tags=obj.tags
+            tags=as_list(obj.tags)
         )
 
     def to_kg_object(self, client):
@@ -105,9 +105,9 @@ class DataAnalysisPatch(ComputationPatch):
     def apply_to_kg_object(self, data_analysis_object, client):
         obj = data_analysis_object
         update_label = False
-        if self.inputs:
+        if self.input:
             obj.inputs = [inp.to_kg_object(client) for inp in self.input]
-        if self.outputs:
+        if self.output:
             obj.outputs = [outp.to_kg_object(client) for outp in self.output]
         if self.environment:
             obj.environment = self.environment.to_kg_object(client)
@@ -122,11 +122,11 @@ class DataAnalysisPatch(ComputationPatch):
             obj.started_by = self.started_by.to_kg_object(client)
             update_label = True
         if self.status:
-            obj.status = ActionStatusType(name=self.status.value),
+            obj.status = ActionStatusType(name=self.status.value)
         if self.resource_usage:
             obj.resource_usages = [ru.to_kg_object(client) for ru in self.resource_usage]
         if self.tags:
-            obj.tags = self.tags
+            obj.tags = as_list(self.tags)
         if update_label:
             obj.lookup_label = f"Data analysis by {obj.started_by.full_name} on {obj.started_at_time.isoformat()} [{obj.id.hex[:7]}]"
         return obj

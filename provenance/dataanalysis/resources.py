@@ -114,7 +114,7 @@ def get_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = D
     or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="in progress")
     return DataAnalysis.from_kg_object(data_analysis_object, kg_client)
 
 
@@ -132,7 +132,7 @@ def replace_data_analysis(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
-    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space)):
+    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
             detail="You can only replace provenance records in your private space "
@@ -162,8 +162,8 @@ def update_data_analysis(
     or that are associated with a collab of which you are an administrator.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    data_analysis_object = omcmp.DataAnalysis.from_uuid(analysis_id, kg_client, scope="in progress")
-    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space)):
+    data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="in progress")
+    if not (data_analysis_object.space == "myspace" or is_collab_admin(data_analysis_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
             detail="You can only modify provenance records in your private space "

@@ -662,7 +662,6 @@ class ComputationPatch(Computation):
     Abstract base class, should not appear in documentation
     """
 
-    id: UUID
     input: List[Union[File, SoftwareVersion]] = None
     output: List[File] = None
     environment: ComputationalEnvironment = None

@@ -19,13 +19,16 @@ ID_PREFIX = "https://kg.ebrains.eu/api/instances"
 TEST_SPACE = "collab-provenance-api-development"
 #TEST_SPACE = "collab-ebrains-workflows"
 
-test_client = TestClient(app)
+
 
 kg_client = KGClient(host="core.kg-ppd.ebrains.eu")  # don't use production for testing
 if kg_client.user_info():
     have_kg_connection = True
 else:
     have_kg_connection = False
+
+
+test_client = TestClient(app)
 
 
 no_kg_err_msg = "No KG connection - have you set the environment variable KG_AUTH_TOKEN?"
@@ -49,8 +52,8 @@ def units():
 def person_obj():
     obj = omcore.Person(
         id=f"{ID_PREFIX}/{uuid4()}",
-        family_name="Davison",
-        given_name="Andrew",
+        family_name="Baggins",
+        given_name="Bilbo",
         digital_identifiers=[
             omcore.ORCID(
                 id=f"{ID_PREFIX}/{uuid4()}",
@@ -112,7 +115,7 @@ def software_version_objs():
 
 @pytest.fixture(scope="module")
 def hardware_obj():
-    obj = omcmp.HardwareSystem(id=f"{ID_PREFIX}/{uuid4()}", name="Top500Number1", version="1")
+    obj = omcmp.HardwareSystem(id=f"{ID_PREFIX}/{uuid4()}", name="openstack_cscs", version="2")
     obj.save(kg_client, space=TEST_SPACE)
     yield obj
     obj.delete(kg_client)
@@ -156,14 +159,14 @@ def launch_config_obj(software_version_objs):
     obj.delete(kg_client)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def data_analysis_obj(person_obj, input_file_obj, output_file_obj, software_version_objs,
                       environment_obj, launch_config_obj, units):
     # pydantic_obj = parse_obj_as(DataAnalysis, EXAMPLES["DataAnalysis"])
     # pydantic_obj.id = uuid4()
     # kg_object = pydantic_obj.to_kg_object(kg_client)
     # kg_object.save(kg_client, space=TEST_SPACE, recursive=True)
-    resource_usage = [omcore.QuantitativeValue(value=1017.3,
+    resource_usage = [omcore.QuantitativeValue(value=2.0,
                                                unit=units["hour"])]
     obj = omcmp.DataAnalysis(
         id=f"{ID_PREFIX}/{uuid4()}",
@@ -172,7 +175,7 @@ def data_analysis_obj(person_obj, input_file_obj, output_file_obj, software_vers
         environment=environment_obj,
         launch_configuration=launch_config_obj,
         started_at_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
-        ended_at_time=datetime(2021, 5, 28, 16, 32, 58,  597000, tzinfo=timezone.utc),
+        ended_at_time=datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc),
         started_by=person_obj,
         status=omterms.ActionStatusType(name="queued"),
         resource_usages=resource_usage,
@@ -196,5 +199,79 @@ def test_about():
 
 
 @pytest.mark.skipif(not have_kg_connection, reason=no_kg_err_msg)
-def test_create_data_analysis(data_analysis_obj):
-    pass
+def test_fixtures(data_analysis_obj):
+    assert data_analysis_obj.started_by.given_name == "Bilbo"
+    assert data_analysis_obj.ended_at_time == datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc)
+
+
+@pytest.mark.skipif(not have_kg_connection, reason=no_kg_err_msg)
+def test_get_data_analysis(data_analysis_obj, environment_obj, software_version_objs):
+    token = kg_client._kg_client.token_handler.get_token()
+    response = test_client.get(f"/analyses/{data_analysis_obj.uuid}",
+                               headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    expected = {
+        "end_time": "2021-05-28T18:32:58.597000+00:00",
+        "environment": {"configuration": [{"description": "hardware configuration for "
+                                           "fake hardware",
+                                           "items": [{"name": "parameter1",
+                                                      "value": "value1"},
+                                                     {"name": "parameter2",
+                                                      "value": "value2"}]}],
+                        "description": "Default environment on fake hardware",
+                        "hardware": "openstack_cscs",
+                        "id": environment_obj.uuid,
+                        "name": "Some hardware that doesn't really exist",
+                        "software": [
+                            {"id": obj.uuid, "software_name": obj.name, "software_version": obj.version_identifier}
+                            for obj in software_version_objs[1:]
+                        ]},
+        "id": data_analysis_obj.uuid,
+        "input": [{"description": "Demonstration data for validation framework",
+                   "file_name": "InputResistance_data.json",
+                   "format": "application/json",
+                   "hash": {"algorithm": "SHA-1",
+                            "value": "716c29320b1e329196ce15d904f7d4e3c7c46685"},
+                   "location": "https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json",
+                   "size": 34},
+                  {"id": software_version_objs[0].uuid,
+                   "software_name": "Elephant",
+                   "software_version": "0.10.0"}],
+        "launch_config": {"arguments": ["-Werror"],
+                          "description": None,
+                          "environment_variables": {"description": None,
+                                                    "items": [{"name": "COLLAB_ID",
+                                                               "value": "myspace"}]},
+                          "executable": "/usr/bin/python",
+                          "name": "dummy launch config"},
+        "output": [{"description": "File generated by some computation",
+                    "file_name": "output_files/Freund_SGA1_T1.2.5_HC-awake-ephys_HBP_1_cell1_ephys__160712_cell1_LFP.png",
+                    "format": "image/png",
+                    "hash": {"algorithm": "SHA-1",
+                             "value": "9006f7ca30ee32d210249ba125dfd96d18b6669e"},
+                    "location": "https://drive.ebrains.eu/f/61ceb5c4aa3c4468a26c/",
+                    "size": 60715}],
+        "resource_usage": [{"units": "hour", "value": 2.0}],
+        "start_time": "2021-05-28T16:32:58.597000+00:00",
+        "started_by": {"family_name": "Baggins",
+                       "given_name": "Bilbo",
+                       "orcid": "http://orcid.org/0000-0002-4793-7541"},
+        "status": "queued",
+        "tags": ["string"]}
+
+    assert response.json() == expected
+
+
+@pytest.mark.skipif(not have_kg_connection, reason=no_kg_err_msg)
+def test_patch_data_analysis(data_analysis_obj):
+    token = kg_client._kg_client.token_handler.get_token()
+    response = test_client.patch(f"/analyses/{data_analysis_obj.uuid}",
+                                 json={"status": "completed"},
+                                 headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+    response2 = test_client.get(f"/analyses/{data_analysis_obj.uuid}",
+                                headers={"Authorization": f"Bearer {token}"})
+    assert response2.status_code == 200
+    assert response2.json()["status"] == "completed"
