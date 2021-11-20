@@ -23,13 +23,16 @@ from uuid import UUID
 from datetime import datetime
 import logging
 
-
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
+import fairgraph.openminds.computation as omcmp
+
+from ..auth.utils import get_kg_client_for_user_account
 from .data_models import Simulation, SimulationPatch, Simulator
 from ..common.data_models import HardwareSystem, Status
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
 from .. import settings
 
 
@@ -61,7 +64,12 @@ def query_simulations(
     The list may contain records of simulations that are public, were performed by the logged-in user,
     or that are associated with a collab of which the user is a member.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    # todo: implement filters
+    simulation_objects = omcmp.Simulation.list(kg_client, scope="in progress", api="query",
+                                               size=size, from_index=from_index,
+                                               space=space)
+    return [obj.from_kg_object(kg_client) for obj in simulation_objects]
 
 
 @router.post("/simulations/", response_model=Simulation, status_code=status.HTTP_201_CREATED)
@@ -73,7 +81,7 @@ def create_simulation(
     """
     Store a new record of a numerical simulation in the Knowledge Graph.
     """
-    pass
+    return create_computation(Simulation, omcmp.Simulation, simulation, space, token)
 
 
 @router.get("/simulations/{simulation_id}", response_model=Simulation)
@@ -81,9 +89,12 @@ def get_simulation(simulation_id: UUID, token: HTTPAuthorizationCredentials = De
     """
     Retrieve a specific simulation record, identified by its ID.
 
-    You may only retrieve public records, records that you created, or records associated with a collab which you can view.
+    You may only retrieve public records, records in your private space,
+    or records associated with a collab which you can view.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    simulation_object = omcmp.Visualization.from_uuid(str(simulation_id), kg_client, scope="in progress")
+    return Simulation.from_kg_object(simulation_object, kg_client)
 
 
 @router.put("/simulations/{simulation_id}", response_model=Simulation)
@@ -95,11 +106,10 @@ def replace_simulation(
     """
     Replace a simulation record in its entirety.
 
-    You may only replace records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only replace records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return replace_computation(Simulation, omcmp.Simulation, simulation_id, simulation, token)
 
 
 @router.patch("/simulations/{simulation_id}", response_model=Simulation)
@@ -111,11 +121,10 @@ def update_simulation(
     """
     Modify part of the metadata in a simulation record.
 
-    You may only update records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only modify records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return patch_computation(Simulation, omcmp.Simulation, simulation_id, patch, token)
 
 
 @router.delete("/simulations/{simulation_id}")
@@ -123,6 +132,7 @@ def delete_simulation(simulation_id: UUID, token: HTTPAuthorizationCredentials =
     """
     Delete a simulation record.
 
-    You may only delete records that you created, or that are associated with a collab of which you are an administrator.
+    You may only delete records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return delete_computation(omcmp.Simulation, simulation_id, token)

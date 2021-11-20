@@ -188,6 +188,7 @@ CERN = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/dbf4d089-9be
 EBI = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/30aa86d9-39b0-45d1-a8c3-a76d64bfe57a")  # create BioModels as an org?
 Bitbucket = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/574d7d5c-056a-4dae-9d1c-921057451199")
 CNRS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/31259b06-91d0-4ad8-acfd-303fc9ed613b")
+JSC = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/<TO DO>")
 
 
 file_location_patterns = {
@@ -206,6 +207,8 @@ file_location_patterns = {
     "https://www.ebi.ac.uk": EBI,
     "https://CrimsonWhite@bitbucket.org": Bitbucket,
     "http://cns.iaf.cnrs-gif.fr": CNRS,
+    "https://gpfs-proxy.brainsimulation.eu/cscs": CSCS,
+    #"https://gpfs-proxy.brainsimulation.eu/jsc": JSC,
 }
 
 
@@ -217,13 +220,18 @@ def get_repository_host(url):
 
 
 CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.]+)/(?P<path>\S*)"
+GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<org>\w+)/(?P<project_name>[\w\.]+)/(?P<path>\S*)"
 
 
 def get_repository_iri(url):
-    pattern = CSCS_pattern
-    match = re.match(pattern, url)
-    if match:
-        return IRI(f"https://object.cscs.ch/v1/{match['proj']}/{match['container_name']}")
+    templates = (
+        (CSCS_pattern, "https://object.cscs.ch/v1/{proj}/{container_name}"),
+        (GPFS_proxy_pattern, "https://gpfs-proxy.brainsimulation.eu/{org}/{project_name}")
+    )
+    for pattern, template in templates:
+        match = re.match(pattern, url)
+        if match:
+            return IRI(template.format(**match.groupdict()))
 
     if url.startswith("https://drive.ebrains.eu"):
         return IRI("https://drive.ebrains.eu")
@@ -231,10 +239,14 @@ def get_repository_iri(url):
 
 
 def get_repository_name(url):
-    pattern = CSCS_pattern
-    match = re.match(pattern, url)
-    if match:
-        return match["container_name"]
+    templates = (
+        (CSCS_pattern, "container_name"),
+        (GPFS_proxy_pattern, "project_name")
+    )
+    for pattern, key in templates:
+        match = re.match(pattern, url)
+        if match:
+            return match[key]
 
     if url.startswith("https://drive.ebrains.eu"):
         return "EBRAINS Drive"
@@ -244,6 +256,8 @@ def get_repository_name(url):
 def get_repository_type(url):
     if url.startswith("https://object.cscs.ch"):
         return FileRepositoryType(name="Swift repository")
+    elif url.startswith("https://gpfs-proxy.brainsimulation.eu"):
+        return FileRepositoryType(name="GPFS repository")
     elif url.startswith("https://drive.ebrains.eu"):
         return FileRepositoryType(name="Seafile repository")
     raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
@@ -546,7 +560,7 @@ class ComputationalEnvironment(BaseModel):
     """The environment within which a computation takes place"""
 
     id: UUID = None
-    name: str =Field(..., description="A name/label for this computing environment")
+    name: str = Field(..., description="A name/label for this computing environment")
     hardware: HardwareSystem = Field(..., description="The hardware system on which this environment runs")
     configuration: Optional[List[
         ParameterSet
@@ -686,7 +700,7 @@ class ModelVersionReference(BaseModel):
 
     @classmethod
     def from_kg_object(cls, model_version, client):
-        return UUID(model_version.uuid)
+        return cls(model_version_id=UUID(model_version.uuid))
 
     def to_kg_object(self, client):
         return KGModelVersion.from_uuid(str(self.model_version_id), client, scope="in progress")

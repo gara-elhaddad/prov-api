@@ -36,6 +36,7 @@ from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import Visualisation, VisualisationPatch
 from ..common.data_models import HardwareSystem, Status
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
 from .. import settings
 
 
@@ -73,7 +74,7 @@ def query_visualisations(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     # todo: implement filters
-    visualisation_objects = omcmp.Visualisation.list(kg_client, scope="in progress", api="query",
+    visualisation_objects = omcmp.Visualization.list(kg_client, scope="in progress", api="query",
                                                     size=size, from_index=from_index,
                                                     space=space)
     return [obj.from_kg_object(kg_client) for obj in visualisation_objects]
@@ -88,22 +89,7 @@ def create_visualisation(
     """
     Store a new record of a visualisation stage in the Knowledge Graph.
     """
-    kg_client = get_kg_client_for_user_account(token.credentials)
-    #(visualisation_obj, started_by, inputs, outputs, environment,
-    # launch_configuration) = visualisation.to_kg_object(kg_client)
-    #for item in (launch_configuration, environment, *outputs, *inputs, started_by, visualisation_obj):
-    #    item.save(kg_client, space="myspace")  # todo: support collab spaces. Save people to common?
-    if visualisation.id is not None:
-        visualisation_object = omcmp.Visualization.from_uuid(str(visualisation.id), kg_client, scope="in progress")
-        if visualisation_object is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A visualisation with id {visualisation.id} already exists. The POST endpoint cannot be used to modify an existing visualisation record.",
-            )
-
-    visualisation_obj = visualisation.to_kg_object(kg_client)
-    visualisation_obj.save(kg_client, space=space, recursive=True)
-    return Visualisation.from_kg_object(visualisation_obj, kg_client)
+    return create_computation(Visualisation, omcmp.Visualization, visualisation, space, token)
 
 
 @router.get("/visualisations/{visualisation_id}", response_model=Visualisation)
@@ -111,10 +97,11 @@ def get_visualisation(visualisation_id: UUID, token: HTTPAuthorizationCredential
     """
     Retrieve a specific visualisation record, identified by its ID.
 
-    You may only retrieve public records, records that you created, or records associated with a collab which you can view.
+    You may only retrieve public records, records in your private space,
+    or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    visualisation_object = omcmp.Visualisation.from_uuid(visualisation_id, kg_client, scope="in progress")
+    visualisation_object = omcmp.Visualization.from_uuid(str(visualisation_id), kg_client, scope="in progress")
     return Visualisation.from_kg_object(visualisation_object, kg_client)
 
 
@@ -127,11 +114,10 @@ def replace_visualisation(
     """
     Replace a visualisation record in its entirety.
 
-    You may only replace records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only replace records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return replace_computation(Visualisation, omcmp.Visualization, visualisation_id, visualisation, token)
 
 
 @router.patch("/visualisations/{visualisation_id}", response_model=Visualisation)
@@ -143,11 +129,10 @@ def update_visualisation(
     """
     Modify part of the metadata in a visualisation record.
 
-    You may only update records that you created, or that are associated with a collab of which you are an administrator.
-
-    DISCUSSION POINT: should this be generally allowed, restricted to administrators/service accounts, or not allowed?
+    You may only update records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return patch_computation(Visualisation, omcmp.Visualization, visualisation_id, patch, token)
 
 
 @router.delete("/analyses/{visualisation_id}", response_model=Visualisation)
@@ -155,6 +140,7 @@ def delete_visualisation(visualisation_id: UUID, token: HTTPAuthorizationCredent
     """
     Delete a visualisation record.
 
-    You may only delete records that you created, or that are associated with a collab of which you are an administrator.
+    You may only delete records in your private space,
+    or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return delete_computation(omcmp.Visualization, visualisation_id, token)

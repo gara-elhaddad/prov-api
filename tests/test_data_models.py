@@ -86,6 +86,10 @@ class TestCommon:
         repo_iri = str(get_repository_iri(file_iri))
         assert repo_iri == "https://object.cscs.ch/v1/AUTH_63ea6845b1d34ad7a43c8158d9572867/Freund_SGA1_T1.2.5"
 
+        file_iri = "https://gpfs-proxy.brainsimulation.eu/cscs/myproject/output_data/simulation_results.nwb"
+        repo_iri = str(get_repository_iri(file_iri))
+        assert repo_iri == "https://gpfs-proxy.brainsimulation.eu/cscs/myproject"
+
     def test_resource_usage(self):
         pydantic_obj = parse_obj_as(ResourceUsage, EXAMPLES["ResourceUsage"])
         kg_client = MockKGClient()

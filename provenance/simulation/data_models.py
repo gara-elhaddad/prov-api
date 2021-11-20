@@ -20,7 +20,7 @@ docstring goes here
 
 import logging
 from enum import Enum
-from uuid import UUID
+from uuid import UUID, uuid4
 from typing import List, Union
 
 from pydantic import Field
@@ -89,7 +89,7 @@ class Simulation(Computation):
             elif isinstance(obj, KGSoftwareVersion):
                 inputs.append(SoftwareVersion.from_kg_object(obj, client))
             elif isinstance(obj, KGModelVersion):
-                inputs.append(KGModelVersion.from_kg_object(obj, client))
+                inputs.append(ModelVersionReference.from_kg_object(obj, client))
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(obj)}")
         return cls(
@@ -115,7 +115,10 @@ class Simulation(Computation):
         outputs = [outp.to_kg_object(client) for outp in self.output]
         environment = self.environment.to_kg_object(client)
         launch_configuration = self.launch_config.to_kg_object(client)
-        resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
+        if self.resource_usage:
+            resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
+        else:
+            resource_usage = None
         obj = self.__class__.kg_cls(
             id=client.uri_from_uuid(self.id),
             lookup_label=f"Simulation run by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
