@@ -11,7 +11,7 @@
 #              -e KG_SERVICE_ACCOUNT_SECRET \
 #              prov_api
 
-FROM debian:buster-slim
+FROM debian:bullseye-slim
 
 MAINTAINER Andrew Davison <andrew.davison@cnrs.fr>
 
