@@ -12,5 +12,7 @@ services:
       - KG_CORE_API_HOST=core.kg-ppd.ebrains.eu
       - EBRAINS_IAM_CLIENT_ID=prov-api
       - EBRAINS_IAM_SECRET=
+      - KG_SERVICE_ACCOUNT_CLIENT_ID=kg-client-model-catalog
+      - KG_SERVICE_ACCOUNT_SECRET=
       - SESSIONS_SECRET_KEY=
       - PROV_API_BASE_URL=https://prov.brainsimulation.eu

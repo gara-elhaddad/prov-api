@@ -22,6 +22,10 @@ in particular filter terms for computation queries, and more testing is needed.
 At present, all metadata are saved in the pre-production version of the KG,
 which is reset from time-to-time, and so metadata will not be preserved long-term:
 for now, please use this only for testing.
+
+To use the API, <a href="/login">login here</a>, click on "Authorize" then
+copy the <pre>access_token</pre> into the "HTTPBearer" box
+(this process will be streamlined for the beta release).
 """
 
 app = FastAPI(title="EBRAINS Provenance API", description=description, version="1.0")
@@ -35,10 +39,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, tags=["Authentication and authorization"])
 app.include_router(simulation.router, tags=["Simulations"])
 app.include_router(dataanalysis.router, tags=["Data analysis"])
 app.include_router(visualisation.router, tags=["Visualisation"])
 app.include_router(optimisation.router, tags=["Optimisation"])
 app.include_router(workflows.router, tags=["Workflows"])
+app.include_router(auth.router, tags=["Authentication and authorization"])
 #app.include_router(vocab.router, tags=["Controlled vocabularies"])
