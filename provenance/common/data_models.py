@@ -38,7 +38,7 @@ from decimal import Decimal
 from datetime import datetime
 from pydantic import BaseModel, AnyUrl, Field
 
-from fairgraph.base_v3 import KGProxyV3 as KGProxy, IRI, as_list
+from fairgraph.base_v3 import KGProxy as KGProxy, IRI, as_list
 #from fairgraph.openminds import controlledterms
 from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
 from fairgraph.openminds.core import (
@@ -48,7 +48,7 @@ from fairgraph.openminds.core import (
     StringParameter as KGStringParameter, NumericalParameter as KGNumericalParameter,
     ModelVersion as KGModelVersion
 )
-from fairgraph.openminds.controlledterms import FileRepositoryType, UnitOfMeasurement
+from fairgraph.openminds.controlledterms import FileRepositoryType, UnitOfMeasurement, ActionStatusType
 from fairgraph.openminds.computation import (
     Environment as KGComputationalEnvironment,
     HardwareSystem as KGHardwareSystem,
@@ -64,13 +64,28 @@ KGHardwareSystem.set_strict_mode(False, "version")
 KGParameterSet.set_strict_mode(False, "relevant_for")
 
 
-class Status(str, Enum):
-    """Status of a computation"""
+status_name_map = {
+    "active": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "potential": "queued"
+}
 
-    queued = "queued"
-    running = "running"
-    completed = "completed"
-    failed = "failed"
+def _get_action_status_types():
+    kg_client_service_account = get_kg_client_for_service_account()
+    return ActionStatusType.list(kg_client_service_account, scope="in progress", 
+                                 api="core", space="controlled", size=10)
+
+
+ACTION_STATUS_TYPES = _get_action_status_types()
+
+Status = Enum(
+    "Status",
+    [(status_name_map[ast.name], status_name_map[ast.name]) 
+     for ast in ACTION_STATUS_TYPES]
+)
+
+ACTION_STATUS_TYPES = {status_name_map[ast.name]: ast for ast in ACTION_STATUS_TYPES}
 
 
 class CryptographicHashFunction(str, Enum):
@@ -89,7 +104,7 @@ def get_identifier(iri, prefix):
 def _get_units_of_measurement():
     # pre-fetch units of measurement
     kg_client_service_account = get_kg_client_for_service_account()
-    units_objects = UnitOfMeasurement.list(kg_client_service_account, scope="latest", space="controlled")
+    units_objects = UnitOfMeasurement.list(kg_client_service_account, api="core", scope="in progress", space="controlled")
     # the follow addition is a temporary workaround with a locally-generated id until core-hour is added
     units_objects.append(UnitOfMeasurement(name="core-hour", id="https://kg.ebrains.eu/api/instances/686f4d65-bdc7-4f69-bf32-4c9f09028541"))
     return units_objects
@@ -106,9 +121,8 @@ UNITS = {u: unit_obj for u, unit_obj in zip(Units, UNITS)}
 
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
-    content_types = KGContentType.list(kg_client_service_account, scope="latest", space="controlled")
+    content_types = KGContentType.list(kg_client_service_account, api="core", scope="in progress", space="controlled", size=10000)
     values = [(get_identifier(ct.id, "ct"), ct.name) for ct in content_types]
-    values.append(("ct_python", "text/x-python"))  # temporary workaround for missing content type we need
     return values
 
 
@@ -306,7 +320,7 @@ class File(BaseModel):
             location=file_object.iri.value,
             file_name=file_object.name,
             size=size,
-            description=file_object.content
+            description=file_object.content_description
         )
 
     def to_kg_object(self, client):
@@ -333,7 +347,7 @@ class File(BaseModel):
             iri=IRI(self.location),
             name=self.file_name,
             storage_size=storage_size,
-            content=self.description
+            content_description=self.description
         )
         return file_obj
 

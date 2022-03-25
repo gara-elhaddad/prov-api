@@ -23,8 +23,8 @@ At present, all metadata are saved in the pre-production version of the KG,
 which is reset from time-to-time, and so metadata will not be preserved long-term:
 for now, please use this only for testing.
 
-To use the API, <a href="/login">login here</a>, click on "Authorize" then
-copy the <pre>access_token</pre> into the "HTTPBearer" box
+To use the API, <a href="/login" target="_blank">login here</a>, click on "Authorize" then
+copy the <i>access_token</i> into the "HTTPBearer" box
 (this process will be streamlined for the beta release).
 """
 

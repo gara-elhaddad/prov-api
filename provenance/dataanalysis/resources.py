@@ -18,27 +18,23 @@ docstring goes here
    limitations under the License.
 """
 
-from os import environ, stat_result
 from typing import List
-from uuid import UUID, uuid4
-from datetime import datetime
+from uuid import UUID
 import logging
-from itertools import chain
-from fairgraph.openminds.computation.environment import Environment
 
 
-from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import ValidationError
 
+from fairgraph.base_v3 import as_list
+import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
-from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
+from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import DataAnalysis, DataAnalysisPatch
-from ..common.data_models import HardwareSystem, LaunchConfiguration, Status
+from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
 from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
-from .. import settings
 
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -75,14 +71,67 @@ def query_analyses(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     # todo: implement filters
-    # todo: query different spaces: "computation", "myspace", private collab spaces for which the user is a member
+    # todo: add cross-link queries to fairgraph
+    filters = {
+        "inputs": []
+    }
+    if dataset:
+        dataset_obj = omcore.DatasetVersion.from_id(str(dataset), kg_client)
+        if dataset_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such dataset"
+            )
+        files = omcore.File.list(kg_client, file_repository=dataset_obj.repository)
+        if len(files) > 100:  # todo: figure out what a reasonable limit is
+            raise HTTPException(
+                status_code=status_codes.HTTP_400_BAD_REQUEST,
+                detail="This dataset has too many files for this query"
+            )
+        if len(files) > 0:
+            filters["inputs"].extend(as_list(files))
+        # todo: support FileBundle
+    # filter by simulation
+    if simulation:
+        # todo: add a query for released simulations
+        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="in progress")
+        if simulation_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such simulation, or you don't have access."
+            )
+        filters["inputs"].extend(as_list(simulation_obj.outputs))
+    # filter by input_data
+    if input_data:
+        filters["inputs"].extend(as_list(input_data))
+    # filter by software
+    if software:
+        filters["inputs"].extend(as_list(software))
+        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress")
+        filters["environment"].extend(as_list(environments))
+    # filter by hardware platform
+    if platform:
+        hardware_obj = omcmp.HardwareSystem.by_name(platform, kg_client, scope="in progress")
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress")
+        filters["environment"].extend(as_list(environments))
+    # filter by status
+    if status:
+        filters["status"] = ACTION_STATUS_TYPES[status]
+    # filter by tag
+    if tags:
+        filters["tags"] = tags
+
+    for key in ("inputs", "environment"):
+        if key in filters and len(filters[key]) == 0:
+            del filters[key]
+
     data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
                                                     size=size, from_index=from_index,
-                                                    space=space)
-    return [obj.from_kg_object(kg_client) for obj in data_analysis_objects]
+                                                    space=space, **filters)
+    return [DataAnalysis.from_kg_object(obj, kg_client) for obj in data_analysis_objects]
 
 
-@router.post("/analyses/", response_model=DataAnalysis, status_code=status.HTTP_201_CREATED)
+@router.post("/analyses/", response_model=DataAnalysis, status_code=status_codes.HTTP_201_CREATED)
 def create_data_analysis(
     data_analysis: DataAnalysis,
     space: str = "myspace",

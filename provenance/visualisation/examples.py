@@ -98,6 +98,10 @@ EXAMPLES = {
             "demo",
             "electrophysiology"
         ],
+        "started_by": {
+            "family_name": "Holmes",
+            "given_name": "Sherlock"
+        },
         "id": "6935971d-ab77-4b48-bda1-c121a5a007ea"
     }
 }

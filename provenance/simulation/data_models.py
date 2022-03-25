@@ -25,7 +25,7 @@ from typing import List, Union
 
 from pydantic import Field
 
-from fairgraph.base_v3 import KGProxyV3
+from fairgraph.base_v3 import KGProxy
 from fairgraph.utility import as_list
 from fairgraph.openminds.computation import Simulation as KGSimulation
 from fairgraph.openminds.controlledterms import ActionStatusType
@@ -46,7 +46,9 @@ from ..common.data_models import (
     Person,
     ResourceUsage,
     LaunchConfiguration,
-    ComputationalEnvironment
+    ComputationalEnvironment,
+    ACTION_STATUS_TYPES,
+    status_name_map
 )
 
 
@@ -82,7 +84,7 @@ class Simulation(Computation):
         dao = simulation_object.resolve(client)
         inputs = []
         for obj in as_list(dao.inputs):
-            if isinstance(obj, KGProxyV3):
+            if isinstance(obj, KGProxy):
                 obj = obj.resolve(client, scope="in progress")
             if isinstance(obj, KGFile):
                 inputs.append(File.from_kg_object(obj, client))
@@ -101,7 +103,7 @@ class Simulation(Computation):
             start_time=dao.started_at_time,
             end_time=dao.ended_at_time,
             started_by=Person.from_kg_object(dao.started_by, client),
-            status=getattr(Status, dao.status.resolve(client).name),
+            status=getattr(Status, status_name_map[dao.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(dao.resource_usages)],
             tags=dao.tags
         )
@@ -130,7 +132,7 @@ class Simulation(Computation):
             ended_at_time=self.end_time,
             started_by=started_by,
             #was_informed_by= # todo
-            status=ActionStatusType(name=self.status.value),
+            status=ACTION_STATUS_TYPES[self.status.value],
             resource_usages=resource_usage,
             tags=self.tags
         )

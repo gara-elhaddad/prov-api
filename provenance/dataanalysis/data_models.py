@@ -21,7 +21,7 @@ docstring goes here
 
 import logging
 from uuid import UUID
-from fairgraph.base_v3 import KGProxyV3
+from fairgraph.base_v3 import KGProxy
 from fairgraph.utility import as_list
 
 from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis
@@ -34,7 +34,7 @@ from fairgraph.openminds.core import (
 
 from ..common.data_models import (
     Computation, ComputationPatch, Status, Person, ResourceUsage, LaunchConfiguration,
-    ComputationalEnvironment, File, SoftwareVersion
+    ComputationalEnvironment, File, SoftwareVersion, ACTION_STATUS_TYPES, status_name_map
 )
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -49,7 +49,7 @@ class DataAnalysis(Computation):
         obj = data_analysis_object.resolve(client)
         inputs = []
         for input in as_list(obj.inputs):
-            if isinstance(input, KGProxyV3):
+            if isinstance(input, KGProxy):
                 input = input.resolve(client, scope="in progress")
             if isinstance(input, KGFile):
                 inputs.append(File.from_kg_object(input, client))
@@ -66,7 +66,7 @@ class DataAnalysis(Computation):
             start_time=obj.started_at_time,
             end_time=obj.ended_at_time,
             started_by=Person.from_kg_object(obj.started_by, client),
-            status=getattr(Status, obj.status.resolve(client).name),
+            status=getattr(Status, status_name_map[obj.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(ru, client) for ru in as_list(obj.resource_usages)],
             tags=as_list(obj.tags)
         )
@@ -92,7 +92,7 @@ class DataAnalysis(Computation):
             ended_at_time=self.end_time,
             started_by=started_by,
             #was_informed_by= # todo
-            status=ActionStatusType(name=self.status.value),
+            status=ACTION_STATUS_TYPES[self.status.value],
             resource_usages=resource_usage,
             tags=self.tags
         )
@@ -122,7 +122,7 @@ class DataAnalysisPatch(ComputationPatch):
             obj.started_by = self.started_by.to_kg_object(client)
             update_label = True
         if self.status:
-            obj.status = ActionStatusType(name=self.status.value)
+            obj.status = ACTION_STATUS_TYPES[self.status.value]
         if self.resource_usage:
             obj.resource_usages = [ru.to_kg_object(client) for ru in self.resource_usage]
         if self.tags:

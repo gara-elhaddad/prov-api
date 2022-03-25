@@ -120,7 +120,7 @@ class TestDataAnalysis:
         )
         inputs = [
             omcore.File(
-                content="Demonstration data for validation framework",
+                content_description="Demonstration data for validation framework",
                 format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
                 hash=omcore.Hash(algorithm="SHA-1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
                 iri=IRI("https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json"),
@@ -170,7 +170,7 @@ class TestDataAnalysis:
             started_at_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
             ended_at_time=datetime(2021, 5, 28, 16, 32, 58,  597000, tzinfo=timezone.utc),
             started_by=started_by,
-            status=omterms.ActionStatusType(name="queued"),
+            status=omterms.ActionStatusType(name="potential"),  # i.e. queued
             resource_usages=resource_usage,
             tags=["string"]
         )
