@@ -3,7 +3,7 @@ docstring goes here
 """
 
 """
-   Copyright 2021 CNRS
+   Copyright 2021-2022 CNRS
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -23,15 +23,17 @@ from uuid import UUID
 from datetime import datetime
 import logging
 
-from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
+from fairgraph.base_v3 import as_list
+import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
 from ..auth.utils import get_kg_client_for_user_account
 from .data_models import Simulation, SimulationPatch, Simulator
-from ..common.data_models import HardwareSystem, Status
+from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
 from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
 from .. import settings
 
@@ -65,14 +67,47 @@ def query_simulations(
     or that are associated with a collab of which the user is a member.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    # todo: implement filters
+    filters = {
+        "inputs": [],
+        "environment": []
+    }
+    # filter by model version
+    if model_version:
+        # todo: add a query for un-released model versions
+        model_version_obj = omcore.ModelVersion.from_id(str(model_version), kg_client, scope="released")
+        if model_version_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such model version, or you don't have access."
+            )
+        filters["inputs"].append(model_version_obj)
+    # filter by simulator
+    if simulator:
+        filters["inputs"].append(simulator)
+    # filter by hardware platform
+    if platform:
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space=space)
+        # todo: handle different versions of hardware platforms
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
+        filters["environment"].extend(as_list(environments))
+    # filter by status
+    if status:
+        filters["status"] = ACTION_STATUS_TYPES[status.value]
+    # filter by tag
+    if tags:
+        filters["tags"] = tags
+
+    for key in ("inputs", "environment"):
+        if key in filters and len(filters[key]) == 0:
+            del filters[key]
+
     simulation_objects = omcmp.Simulation.list(kg_client, scope="in progress", api="query",
                                                size=size, from_index=from_index,
                                                space=space)
     return [obj.from_kg_object(kg_client) for obj in simulation_objects]
 
 
-@router.post("/simulations/", response_model=Simulation, status_code=status.HTTP_201_CREATED)
+@router.post("/simulations/", response_model=Simulation, status_code=status_codes.HTTP_201_CREATED)
 def create_simulation(
     simulation: Simulation,
     space: str = "myspace",

@@ -23,11 +23,14 @@ from uuid import UUID
 from datetime import datetime
 import logging
 
+import fairgraph.openminds.computation as omcmp
 
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
+from ..auth.utils import get_kg_client_for_user_account
+from ..common.utils import create_computation, delete_computation
 from .data_models import Workflow
 from .. import settings
 
@@ -56,11 +59,15 @@ def query_workflows(
 
 
 @router.post("/workflows/", response_model=Workflow, status_code=status.HTTP_201_CREATED)
-def store_recorded_workflow(workflow: Workflow, token: HTTPAuthorizationCredentials = Depends(auth)):
+def store_recorded_workflow(
+    workflow: Workflow, 
+    space: str = "myspace",
+    token: HTTPAuthorizationCredentials = Depends(auth)
+):
     """
     Store a new record of a workflow execution in the Knowledge Graph.
     """
-    pass
+    return create_computation(Workflow, omcmp.WorkflowExecution, workflow, space, token)
 
 
 @router.get("/workflows/{workflow_id}", response_model=Workflow)
@@ -70,7 +77,9 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
 
     You may only retrieve public records, records that you created, or records associated with a collab which you can view.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="in progress")
+    return omcmp.WorkflowExecution.from_kg_object(workflow_object, kg_client)
 
 
 @router.delete("/workflows/{workflow_id}")
@@ -80,4 +89,4 @@ def delete_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials = Dep
 
     You may only delete records that you created, or that are associated with a collab of which you are an administrator.
     """
-    pass
+    return delete_computation(omcmp.WorkflowExecution, workflow_id, token)

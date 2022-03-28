@@ -3,7 +3,7 @@ docstring goes here
 """
 
 """
-   Copyright 2021 CNRS
+   Copyright 2021-2022 CNRS
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -70,10 +70,10 @@ def query_analyses(
     or that are associated with a collab of which the user is a member.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    # todo: implement filters
     # todo: add cross-link queries to fairgraph
     filters = {
-        "inputs": []
+        "inputs": [],
+        "environment": []
     }
     if dataset:
         dataset_obj = omcore.DatasetVersion.from_id(str(dataset), kg_client)
@@ -107,16 +107,17 @@ def query_analyses(
     # filter by software
     if software:
         filters["inputs"].extend(as_list(software))
-        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress")
+        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by hardware platform
     if platform:
-        hardware_obj = omcmp.HardwareSystem.by_name(platform, kg_client, scope="in progress")
-        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress")
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space=space)
+        # todo: handle different versions of hardware platforms
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by status
     if status:
-        filters["status"] = ACTION_STATUS_TYPES[status]
+        filters["status"] = ACTION_STATUS_TYPES[status.value]
     # filter by tag
     if tags:
         filters["tags"] = tags

@@ -3,7 +3,7 @@ docstring goes here
 """
 
 """
-   Copyright 2021 CNRS
+   Copyright 2021-2022 CNRS
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -26,16 +26,18 @@ import logging
 from itertools import chain
 
 
-from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
+from fairgraph.base_v3 import as_list
+import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
 from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import Visualisation, VisualisationPatch
-from ..common.data_models import HardwareSystem, Status
+from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
 from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
 from .. import settings
 
@@ -73,14 +75,68 @@ def query_visualisations(
     or that are associated with a collab of which the user is a member.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    # todo: implement filters
+    filters = {
+        "inputs": [],
+        "environment": []
+    }
+    if dataset:
+        dataset_obj = omcore.DatasetVersion.from_id(str(dataset), kg_client)
+        if dataset_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such dataset"
+            )
+        files = omcore.File.list(kg_client, file_repository=dataset_obj.repository)
+        if len(files) > 100:  # todo: figure out what a reasonable limit is
+            raise HTTPException(
+                status_code=status_codes.HTTP_400_BAD_REQUEST,
+                detail="This dataset has too many files for this query"
+            )
+        if len(files) > 0:
+            filters["inputs"].extend(as_list(files))
+        # todo: support FileBundle
+    # filter by simulation
+    if simulation:
+        # todo: add a query for released simulations
+        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="in progress")
+        if simulation_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such simulation, or you don't have access."
+            )
+        filters["inputs"].extend(as_list(simulation_obj.outputs))
+    # filter by input_data
+    if input_data:
+        filters["inputs"].extend(as_list(input_data))
+    # filter by software
+    if software:
+        filters["inputs"].extend(as_list(software))
+        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress", space=space)
+        filters["environment"].extend(as_list(environments))
+    # filter by hardware platform
+    if platform:
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space=space)
+        # todo: handle different versions of hardware platforms
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
+        filters["environment"].extend(as_list(environments))
+    # filter by status
+    if status:
+        filters["status"] = ACTION_STATUS_TYPES[status.value]
+    # filter by tag
+    if tags:
+        filters["tags"] = tags
+
+    for key in ("inputs", "environment"):
+        if key in filters and len(filters[key]) == 0:
+            del filters[key]
+
     visualisation_objects = omcmp.Visualization.list(kg_client, scope="in progress", api="query",
                                                     size=size, from_index=from_index,
                                                     space=space)
     return [obj.from_kg_object(kg_client) for obj in visualisation_objects]
 
 
-@router.post("/visualisations/", response_model=Visualisation, status_code=status.HTTP_201_CREATED)
+@router.post("/visualisations/", response_model=Visualisation, status_code=status_codes.HTTP_201_CREATED)
 def create_visualisation(
     visualisation: Visualisation,
     space: str = "myspace",
