@@ -21,7 +21,8 @@ RUN unset DEBIAN_FRONTEND
 
 RUN pip3 install --upgrade pip
 
-RUN git clone https://github.com/apdavison/fairgraph.git
+ADD https://api.github.com/repos/HumanBrainProject/fairgraph/git/refs/heads/master fairgraph_version.json
+RUN git clone --branch master https://github.com/apdavison/fairgraph.git
 RUN pip3 install -r fairgraph/requirements.txt
 RUN pip3 install ./fairgraph
 
