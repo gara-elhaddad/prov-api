@@ -43,6 +43,8 @@ router = APIRouter()
 
 @router.get("/workflows/", response_model=List[WorkflowExecution])
 def query_workflows(
+    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    recipe_id: UUID = Query(None, description="Return runs of the workflow recipe with the given ID"),
     tags: List[str] = Query(None, description="Return workflows with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),
     from_index: int = Query(0, description="Index of the first record to return"),
@@ -55,7 +57,15 @@ def query_workflows(
     The list may contain records of workflows that are public, were launched by the logged-in user,
     or that are associated with a collab of which the user is a member.
     """
-    pass
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    filters = {}
+    if recipe_id:
+        filters["recipe_id"] = str(recipe_id)
+    # todo: handle tags
+    workflows = omcmp.WorkflowExecution.list(
+        kg_client, scope="in progress", space=space,
+        from_index=from_index, size=size, **filters)
+    return [WorkflowExecution.from_kg_object(wf, kg_client) for wf in workflows]
 
 
 @router.post("/workflows/", response_model=WorkflowExecution, status_code=status.HTTP_201_CREATED)
