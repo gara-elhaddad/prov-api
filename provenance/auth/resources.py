@@ -47,9 +47,10 @@ async def login_via_ebrains(request: Request):
 @router.get("/auth")
 async def auth_via_ebrains(request: Request):
     token = await oauth.ebrains.authorize_access_token(request)
-    user = await oauth.ebrains.parse_id_token(request, token)
-    user2 = await oauth.ebrains.userinfo(token=token)
-    user.update(user2)
+    #user = await oauth.ebrains.parse_id_token(request, token)
+    user = token["userinfo"]
+    #user2 = await oauth.ebrains.userinfo(token=token)
+    #user.update(user2)
     response = {
         "access_token": token["access_token"],
         "user": {
