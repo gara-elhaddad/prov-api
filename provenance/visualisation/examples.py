@@ -1,6 +1,7 @@
 
 EXAMPLES = {
     "Visualisation": {
+        "type": "visualization",
         "input": [
             {
                 "description": "Simple script to plot the data in an electrophysiology data file, version 0.1.0",

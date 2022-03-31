@@ -20,7 +20,9 @@ docstring goes here
 
 
 import logging
+from typing import Literal
 from fairgraph.openminds.computation import Visualization as KGVisualization
+from ..common.data_models import ComputationType
 from ..dataanalysis.data_models import DataAnalysis, DataAnalysisPatch
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -29,6 +31,9 @@ logger = logging.getLogger("ebrains-prov-api")
 class Visualisation(DataAnalysis):
     """Record of a visualisation"""
     kg_cls = KGVisualization
+    
+    type: Literal["visualization"]
+
 
 
 class VisualisationPatch(DataAnalysisPatch):

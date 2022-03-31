@@ -16,10 +16,12 @@ from provenance.common.data_models import ResourceUsage, get_repository_iri
 from provenance.dataanalysis.data_models import DataAnalysis
 from provenance.visualisation.data_models import Visualisation
 from provenance.simulation.data_models import Simulation
+from provenance.workflows.data_models import WorkflowExecution
 import provenance.common.examples
 import provenance.simulation.examples
 import provenance.dataanalysis.examples
 import provenance.visualisation.examples
+import provenance.workflows.examples
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
@@ -30,6 +32,7 @@ EXAMPLES = provenance.common.examples.EXAMPLES
 EXAMPLES.update(provenance.dataanalysis.examples.EXAMPLES)
 EXAMPLES.update(provenance.visualisation.examples.EXAMPLES)
 EXAMPLES.update(provenance.simulation.examples.EXAMPLES)
+EXAMPLES.update(provenance.workflows.examples.EXAMPLES)
 
 ID_PREFIX = "https://kg.ebrains.eu/api/instances"
 
@@ -203,5 +206,13 @@ class TestSimulation:
 
     def test_conversion_to_kg_objects(self):
         pydantic_obj = parse_obj_as(Simulation, EXAMPLES["Simulation"])
+        kg_client = MockKGClient()
+        kg_objects = pydantic_obj.to_kg_object(kg_client)
+
+
+class TestWorkflow:
+
+    def test_conversion_to_kg_objects(self):
+        pydantic_obj = parse_obj_as(WorkflowExecution, EXAMPLES["WorkflowExecution"])
         kg_client = MockKGClient()
         kg_objects = pydantic_obj.to_kg_object(kg_client)

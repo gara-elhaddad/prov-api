@@ -20,21 +20,18 @@ docstring goes here
 
 
 import logging
-from uuid import UUID
+from uuid import UUID, uuid4
+from typing import Literal
 from fairgraph.base_v3 import KGProxy
 from fairgraph.utility import as_list
 
-from fairgraph.openminds.computation import DataAnalysis as KGDataAnalysis
-from fairgraph.openminds.controlledterms import ActionStatusType
-from fairgraph.openminds.core import (
-    Person as KGPerson,
-    File as KGFile,
-    SoftwareVersion as KGSoftwareVersion
-)
+import fairgraph.openminds.computation as omcmp
+import fairgraph.openminds.core as omcore
 
 from ..common.data_models import (
     Computation, ComputationPatch, Status, Person, ResourceUsage, LaunchConfiguration,
-    ComputationalEnvironment, File, SoftwareVersion, ACTION_STATUS_TYPES, status_name_map
+    ComputationalEnvironment, File, SoftwareVersion, ACTION_STATUS_TYPES, status_name_map,
+    ComputationType
 )
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -42,7 +39,9 @@ logger = logging.getLogger("ebrains-prov-api")
 
 class DataAnalysis(Computation):
     """Record of a data analysis"""
-    kg_cls = KGDataAnalysis
+    kg_cls = omcmp.DataAnalysis
+
+    type: Literal["data analysis"]
 
     @classmethod
     def from_kg_object(cls, data_analysis_object, client):
@@ -51,14 +50,15 @@ class DataAnalysis(Computation):
         for input in as_list(obj.inputs):
             if isinstance(input, KGProxy):
                 input = input.resolve(client, scope="in progress")
-            if isinstance(input, KGFile):
+            if isinstance(input, (omcore.File, omcmp.LocalFile)):
                 inputs.append(File.from_kg_object(input, client))
-            elif isinstance(input, KGSoftwareVersion):
+            elif isinstance(input, omcore.SoftwareVersion):
                 inputs.append(SoftwareVersion.from_kg_object(input, client))
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(input)}")
         return cls(
-            id=client.uuid_from_uri(obj.id),
+            id=client.uuid_from_uri(obj.id),  # just obj.uuid, no?
+            type=cls.__fields__["type"].type_.__args__[0],  # "data analysis"
             input=inputs,
             output=[File.from_kg_object(outp, client) for outp in as_list(obj.outputs)],
             environment=ComputationalEnvironment.from_kg_object(obj.environment, client),
@@ -75,12 +75,14 @@ class DataAnalysis(Computation):
         if self.started_by:
             started_by = self.started_by.to_kg_object(client)
         else:
-            started_by = KGPerson.me(client)  # todo
+            started_by = omcore.Person.me(client)  # todo
         inputs = [inp.to_kg_object(client) for inp in self.input]
         outputs = [outp.to_kg_object(client) for outp in self.output]
         environment = self.environment.to_kg_object(client)
         launch_configuration = self.launch_config.to_kg_object(client)
         resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
+        if self.id is None:
+            self.id = uuid4()
         obj = self.__class__.kg_cls(
             id=client.uri_from_uuid(self.id),
             lookup_label=f"Data analysis by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",

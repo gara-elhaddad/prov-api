@@ -28,8 +28,6 @@ import json
 from fairgraph.registry import lookup_by_id
 from fairgraph.utility import as_list
 
-from pydantic.errors import DecimalIsNotFiniteError
-
 try:
     from typing import Literal  # Python >= 3.8
 except ImportError:
@@ -41,27 +39,12 @@ from pydantic import BaseModel, AnyUrl, Field
 from fairgraph.base_v3 import KGProxy as KGProxy, IRI, as_list
 #from fairgraph.openminds import controlledterms
 from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
-from fairgraph.openminds.core import (
-    Person as KGPerson, ORCID, File as KGFile, Organization as KGOrganization,
-    FileRepository as KGFileRepository, Hash as KGHash, ContentType as KGContentType,
-    SoftwareVersion as KGSoftwareVersion, ParameterSet as KGParameterSet,
-    StringParameter as KGStringParameter, NumericalParameter as KGNumericalParameter,
-    ModelVersion as KGModelVersion
-)
+import fairgraph.openminds.core as omcore
+import fairgraph.openminds.computation as omcmp
 from fairgraph.openminds.controlledterms import FileRepositoryType, UnitOfMeasurement, ActionStatusType
-from fairgraph.openminds.computation import (
-    Environment as KGComputationalEnvironment,
-    HardwareSystem as KGHardwareSystem,
-    LaunchConfiguration as KGLaunchConfiguration
-)
 
 from .examples import EXAMPLES
 from ..auth.utils import get_kg_client_for_service_account
-
-
-KGFile.set_strict_mode(False, "is_part_of")
-KGHardwareSystem.set_strict_mode(False, "version")
-KGParameterSet.set_strict_mode(False, "relevant_for")
 
 
 status_name_map = {
@@ -121,7 +104,7 @@ UNITS = {u: unit_obj for u, unit_obj in zip(Units, UNITS)}
 
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
-    content_types = KGContentType.list(kg_client_service_account, api="core", scope="in progress", space="controlled", size=10000)
+    content_types = omcore.ContentType.list(kg_client_service_account, api="core", scope="in progress", space="controlled", size=10000)
     values = [(get_identifier(ct.id, "ct"), ct.name) for ct in content_types]
     return values
 
@@ -131,59 +114,13 @@ ContentType = Enum(
     _get_content_types()
 )
 
-class Licence(str, Enum):
-    """Software or document licence"""
 
-    gpl3 = "GPL3"
-    bsd = "BSD"
-    ccby = "CC-BY"
-    mit = "MIT"
-    apache = "Apache v2"
-    todo = "list to be completed"
-
-
-class Species(str, Enum):
-    mouse = "Mus musculus"
-    rat = "Rattus norvegicus"
-    human = "Homo sapiens"
-    macaque = "Macaca mulatta"
-    marmoset = "Callithrix jacchus"
-    rodent = "Rodentia"  # yes, not a species
-    opossum = "Monodelphis domestica"
-    platypus = "Ornithorhynchus anatinus"
-
-
-BrainRegion = Enum(
-    "BrainRegion",
-    [(name.replace(" ", "_"), name) for name in ["cortex", "hippocampus", "list to be completed"]],
-)
-
-
-ModelScope = Enum(
-    "ModelScope",
-    [
-        (name.replace(" ", "_").replace(":", "__"), name)
-        for name in ["single cell", "network", "list to be completed"]
-    ],
-)
-
-
-AbstractionLevel = Enum(
-    "AbstractionLevel",
-    [
-        (name.replace(" ", "_").replace(":", "__"), name)
-        for name in ["spiking neurons", "neural field", "list to be completed"]
-    ],
-)
-
-
-CellType = Enum(
-    "CellType",
-    [
-        (name.replace(" ", "_"), name)
-        for name in ["pyramidal cell", "interneuron", "list to be completed"]
-    ],
-)
+class ComputationType(str, Enum):
+    visualization = "visualization"
+    analysis = "data analysis"
+    simulation = "simulation"
+    optimization = "optimization"
+    #preprocessing = "pre-processing"
 
 
 class Digest(BaseModel):
@@ -193,35 +130,44 @@ class Digest(BaseModel):
     algorithm: CryptographicHashFunction
 
 
-# todo: look these up, don't hard code, might have different UUIDs in prod, int, dev, etc.
-CSCS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/e3f16a1a-184e-447d-aced-375c00ec4d41")
-Github = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/8e16b752-a95a-41f9-acc7-7f7e7c950f1d")
-Yale = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/5093d906-e058-47e9-a9eb-ac56354f79fc")  # create ModelDB as an org?
-EBRAINS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/7dfdd91f-3d05-424a-80bd-6d1d5dc11cd3")
-CERN = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/dbf4d089-9be1-4420-822b-87ecb7204840")  # create Zenodo as an org?
-EBI = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/30aa86d9-39b0-45d1-a8c3-a76d64bfe57a")  # create BioModels as an org?
-Bitbucket = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/574d7d5c-056a-4dae-9d1c-921057451199")
-CNRS = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/31259b06-91d0-4ad8-acfd-303fc9ed613b")
-JSC = KGProxy(KGOrganization, "https://kg.ebrains.eu/api/instances/<TO DO>")
+def _get_hosting_organizations():
+    kg_client_service_account = get_kg_client_for_service_account()
+    hosting_orgs = {
+        name: omcore.Organization.list(kg_client_service_account, scope="in progress", space="common", alias=name)[0]
+        for name in ("EBRAINS", "GitHub", "Yale", "EBI", "CERN", "CSCS", "CNRS")
+    }
+    # CSCS = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/e3f16a1a-184e-447d-aced-375c00ec4d41")
+    # GitHub = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/8e16b752-a95a-41f9-acc7-7f7e7c950f1d")
+    # Yale = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/5093d906-e058-47e9-a9eb-ac56354f79fc")  # create ModelDB as an org?
+    # EBRAINS = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/7dfdd91f-3d05-424a-80bd-6d1d5dc11cd3")
+    # CERN = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/dbf4d089-9be1-4420-822b-87ecb7204840")  # create Zenodo as an org?
+    # EBI = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/30aa86d9-39b0-45d1-a8c3-a76d64bfe57a")  # create BioModels as an org?
+    # Bitbucket = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/574d7d5c-056a-4dae-9d1c-921057451199")
+    # CNRS = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/31259b06-91d0-4ad8-acfd-303fc9ed613b")
+    # JSC = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/<TO DO>")
+    return hosting_orgs
+
+
+FILE_HOSTS = _get_hosting_organizations()
 
 
 file_location_patterns = {
-    "https://object.cscs.ch": EBRAINS,
-    "swift://cscs.ch": EBRAINS,
-    "https://ksproxy.cscs.ch": EBRAINS,
-    "https://kg.humanbrainproject.org/proxy/export": EBRAINS,
-    "https://github.com": Github,
-    "https://senselab.med.yale.edu": Yale,
-    "http://modeldb.yale.edu": Yale,
+    "https://object.cscs.ch": FILE_HOSTS["EBRAINS"],
+    "swift://cscs.ch": FILE_HOSTS["EBRAINS"],
+    "https://ksproxy.cscs.ch": FILE_HOSTS["EBRAINS"],
+    "https://kg.humanbrainproject.org/proxy/export": FILE_HOSTS["EBRAINS"],
+    "https://github.com": FILE_HOSTS["GitHub"],
+    "https://senselab.med.yale.edu": FILE_HOSTS["Yale"],
+    "http://modeldb.yale.edu": FILE_HOSTS["Yale"],
     "http://example.com": None,
-    "https://collab.humanbrainproject.eu": EBRAINS,
-    "collab://": EBRAINS,
-    "https://drive.ebrains.eu": EBRAINS,
-    "https://zenodo.org": CERN,
-    "https://www.ebi.ac.uk": EBI,
-    "https://CrimsonWhite@bitbucket.org": Bitbucket,
-    "http://cns.iaf.cnrs-gif.fr": CNRS,
-    "https://gpfs-proxy.brainsimulation.eu/cscs": CSCS,
+    "https://collab.humanbrainproject.eu": FILE_HOSTS["EBRAINS"],
+    "collab://": FILE_HOSTS["EBRAINS"],
+    "https://drive.ebrains.eu": FILE_HOSTS["EBRAINS"],
+    "https://zenodo.org": FILE_HOSTS["CERN"],
+    "https://www.ebi.ac.uk": FILE_HOSTS["EBI"],
+    #"https://CrimsonWhite@bitbucket.org": FILE_HOSTS["Bitbucket"],
+    "http://cns.iaf.cnrs-gif.fr": FILE_HOSTS["CNRS"],
+    "https://gpfs-proxy.brainsimulation.eu/cscs": FILE_HOSTS["CSCS"],
     #"https://gpfs-proxy.brainsimulation.eu/jsc": JSC,
 }
 
@@ -234,13 +180,14 @@ def get_repository_host(url):
 
 
 CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.]+)/(?P<path>\S*)"
-GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<org>\w+)/(?P<project_name>[\w\.]+)/(?P<path>\S*)"
-
+GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<site>\w+)/(?P<project_name>[\w-]+)/(?P<path>\S*)"
+EBRAINS_Gitlab_pattern = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)/-/"
 
 def get_repository_iri(url):
     templates = (
         (CSCS_pattern, "https://object.cscs.ch/v1/{proj}/{container_name}"),
-        (GPFS_proxy_pattern, "https://gpfs-proxy.brainsimulation.eu/{org}/{project_name}")
+        (GPFS_proxy_pattern, "https://gpfs-proxy.brainsimulation.eu/{site}/{project_name}"),
+        (EBRAINS_Gitlab_pattern, "https://gitlab.ebrains.eu/{org}/{project_name}")
     )
     for pattern, template in templates:
         match = re.match(pattern, url)
@@ -255,7 +202,8 @@ def get_repository_iri(url):
 def get_repository_name(url):
     templates = (
         (CSCS_pattern, "container_name"),
-        (GPFS_proxy_pattern, "project_name")
+        (GPFS_proxy_pattern, "project_name"),
+        (EBRAINS_Gitlab_pattern, "project_name")
     )
     for pattern, key in templates:
         match = re.match(pattern, url)
@@ -267,13 +215,25 @@ def get_repository_name(url):
     raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
 
 
+def _get_repository_types():
+    kg_client_service_account = get_kg_client_for_service_account()
+    return {
+        obj.name: obj for obj in FileRepositoryType.list(kg_client_service_account, scope="released")
+    }
+
+REPOSITORY_TYPES = _get_repository_types()
+
 def get_repository_type(url):
     if url.startswith("https://object.cscs.ch"):
-        return FileRepositoryType(name="Swift repository")
+        return REPOSITORY_TYPES["Swift repository"]
     elif url.startswith("https://gpfs-proxy.brainsimulation.eu"):
-        return FileRepositoryType(name="GPFS repository")
+        return REPOSITORY_TYPES["GPFS repository"]
     elif url.startswith("https://drive.ebrains.eu"):
-        return FileRepositoryType(name="Seafile repository")
+        return REPOSITORY_TYPES["Seafile repository"]
+    elif url.startswith("https://gitlab.ebrains.eu"):
+        return REPOSITORY_TYPES["GitLab repository"]
+    elif url.startswith("https://github.com"):
+        return REPOSITORY_TYPES["GitHub repository"]
     raise NotImplementedError(f"Repository IRI format not yet supported. Value was {url}")
 
 
@@ -283,7 +243,7 @@ class File(BaseModel):
     description: Optional[str] = Field(None, title="Description of the file contents")
     format: Optional[ContentType] = Field(None, title="Content type of the file, expressed as a media type string")
     hash: Digest = None
-    location: AnyUrl
+    location: AnyUrl = None  # for files generated within workflows but not preserved, location may be None
     file_name: str
     size: Optional[int] = Field(None, title="File size in bytes")
     # bundle
@@ -314,68 +274,108 @@ class File(BaseModel):
             size = int(file_object.storage_size.value)
         else:
             size = None
+        if isinstance(file_object, omcore.File):
+            location = file_object.iri.value
+        else:
+            assert isinstance(file_object, omcmp.LocalFile)
+            location = f"file://{file_object.path}"
         return cls(
             format=format,
             hash=hash,
-            location=file_object.iri.value,
+            location=location,
             file_name=file_object.name,
             size=size,
             description=file_object.content_description
         )
 
     def to_kg_object(self, client):
-        file_repository = KGFileRepository(
-            hosted_by=get_repository_host(self.location),
-            iri=get_repository_iri(self.location),
-            name=get_repository_name(self.location),
-            repository_type=get_repository_type(self.location)
-        )
+        if self.location and self.location.startswith("http"):
+            file_repository = omcore.FileRepository(
+                hosted_by=get_repository_host(self.location),
+                iri=get_repository_iri(self.location),
+                name=get_repository_name(self.location),
+                repository_type=get_repository_type(self.location)
+            )
+        else:
+            file_repository = None
         if self.format:
-            content_type = KGContentType(name=self.format.value)
+            content_type = omcore.ContentType(name=self.format.value)
         else:
             # todo: if self.format is empty, we should try to infer it
             content_type = None
-        hash = KGHash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
+        hash = omcore.Hash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
         if self.size is None:
             storage_size = None
         else:
             storage_size = QuantitativeValue(value=float(self.size), unit=UNITS[Units("byte")])
-        file_obj = KGFile(
-            file_repository=file_repository,
-            format=content_type,
-            hash=hash,
-            iri=IRI(self.location),
-            name=self.file_name,
-            storage_size=storage_size,
-            content_description=self.description
-        )
+        if file_repository:
+            file_obj = omcore.File(
+                file_repository=file_repository,
+                format=content_type,
+                hash=hash,
+                iri=IRI(self.location),
+                name=self.file_name,
+                storage_size=storage_size,
+                content_description=self.description
+            )
+        else:
+            if self.location:
+                path = self.location.replace("file://", "")
+            else:
+                path = self.file_name
+            file_obj = omcmp.LocalFile(
+                path=path,
+                format=content_type,
+                hash=hash,
+                name=self.file_name,
+                storage_size=storage_size,
+                content_description=self.description
+            )
         return file_obj
 
 
-class HardwareSystem(str, Enum):
-    """Computer hardware system
+def _get_hardware_systems():
+    kg_client_service_account = get_kg_client_for_service_account()
+    return {
+        obj.name: obj for obj in omcmp.HardwareSystem.list(kg_client_service_account, scope="in progress", space="common")
+    }
 
-    "spinnaker":     the SpiNNaker 600 board machine at University of Manchester
-    "spinnaker4":    a SpiNNaker 4-chip board
-    "spinnaker48":   a SpiNNaker 48-chip board
-    "brainscales1":  the BrainScaleS-1 system at Heidelberg University
-    "pizdaint":      Piz Daint (CSCS)
-    "jusuf":         JUSUF (JSC)
-    "galileo"        Galileo100 (CINECA)
-    "openstack_cscs" OpenStack VMs at CSCS
-    "openstack_jsc"  OpenStack VMs at JSC
 
-    """
+HARDWARE_SYSTEMS = _get_hardware_systems()
 
-    spinnaker = "spinnaker"  # the SpiNNaker 600 board machine at University of Manchester"
-    spinnaker4 = "spinnaker4"  # a SpiNNaker 4-chip board"
-    spinnaker48 = "spinnaker48"  # a SpiNNaker 48-chip board"
-    brainscales1 = "brainscales1"  # the BrainScaleS-1 system at Heidelberg University"
-    pizdaint = "pizdaint"  # Piz Daint (CSCS)"
-    jusuf = "jusuf"  # "JUSUF (JSC)"
-    galileo100 = "galileo"  # Galileo100 (CINECA)"
-    openstack_cscs = "openstack_cscs"
-    openstack_jsc = "openstack_jsc"
+
+HardwareSystem = Enum(
+    "HardwareSystem",
+    [(name, name) for name in HARDWARE_SYSTEMS]
+)
+
+
+# class HardwareSystem(str, Enum):
+#     """Computer hardware system
+
+#     "spinnaker":     the SpiNNaker 600 board machine at University of Manchester
+#     "spinnaker4":    a SpiNNaker 4-chip board
+#     "spinnaker48":   a SpiNNaker 48-chip board
+#     "brainscales1":  the BrainScaleS-1 system at Heidelberg University
+#     "pizdaint":      Piz Daint (CSCS)
+#     "jusuf":         JUSUF (JSC)
+#     "galileo"        Galileo100 (CINECA)
+#     "openstack_cscs" OpenStack VMs at CSCS
+#     "openstack_jsc"  OpenStack VMs at JSC
+#     "generic"        any hardware system not specified above
+
+#     """
+
+#     spinnaker = "spinnaker"  # the SpiNNaker 600 board machine at University of Manchester"
+#     spinnaker4 = "spinnaker4"  # a SpiNNaker 4-chip board"
+#     spinnaker48 = "spinnaker48"  # a SpiNNaker 48-chip board"
+#     brainscales1 = "brainscales1"  # the BrainScaleS-1 system at Heidelberg University"
+#     pizdaint = "pizdaint"  # Piz Daint (CSCS)"
+#     jusuf = "jusuf"  # "JUSUF (JSC)"
+#     galileo100 = "galileo"  # Galileo100 (CINECA)"
+#     openstack_cscs = "openstack_cscs"
+#     openstack_jsc = "openstack_jsc"
+#     generic = "generic"
 
 
 class StringParameter(BaseModel):
@@ -400,7 +400,7 @@ class StringParameter(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return KGStringParameter(name=self.name, value=self.value)
+        return omcore.StringParameter(name=self.name, value=self.value)
 
 
 class NumericalParameter(BaseModel):
@@ -431,7 +431,7 @@ class NumericalParameter(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return KGNumericalParameter(
+        return omcore.NumericalParameter(
             name=self.name,
             values=QuantitativeValue(value=self.value, units=UNITS[self.units])
         )
@@ -454,9 +454,9 @@ class ParameterSet(BaseModel):
     def from_kg_object(cls, ps_object, client):
         items = []
         for param in as_list(ps_object.parameters):
-            if isinstance(param, KGNumericalParameter):
+            if isinstance(param, omcore.NumericalParameter):
                 items.append(NumericalParameter.from_kg_object(param))
-            elif isinstance(param, KGStringParameter):
+            elif isinstance(param, omcore.StringParameter):
                 items.append(StringParameter.from_kg_object(param))
             else:
                 raise TypeError("unexpected object type in parameter set")
@@ -466,7 +466,7 @@ class ParameterSet(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return KGParameterSet(
+        return omcore.ParameterSet(
             parameters=[item.to_kg_object(client) for item in self.items],
             context=self.description
         )
@@ -494,19 +494,19 @@ class Person(BaseModel):
         orcid = None
         if person.digital_identifiers:
             for digid in as_list(person.digital_identifiers):
-                if isinstance(digid, ORCID):
+                if isinstance(digid, omcore.ORCID):
                     orcid = digid.identifier
                     break
-                elif isinstance(digid, KGProxy) and digid.cls == ORCID:
+                elif isinstance(digid, KGProxy) and digid.cls == omcore.ORCID:
                     orcid = digid.resolve(client, scope="in progress").identifier
                     break
         return cls(given_name=person.given_name, family_name=person.family_name,
                    orcid=orcid)
 
     def to_kg_object(self, client):
-        obj = KGPerson(family_name=self.family_name, given_name=self.given_name)
+        obj = omcore.Person(family_name=self.family_name, given_name=self.given_name)
         if self.orcid:
-            obj.digital_identifiers = [ORCID(identifier=self.orcid)]
+            obj.digital_identifiers = [omcore.ORCID(identifier=self.orcid)]
         return obj
 
 
@@ -553,9 +553,9 @@ class SoftwareVersion(BaseModel):
 
     @classmethod
     def from_kg_object(cls, software_version_object, client):
-        KGSoftwareVersion.set_strict_mode(False)
+        omcore.SoftwareVersion.set_strict_mode(False)
         svo = software_version_object.resolve(client, scope="in progress")
-        KGSoftwareVersion.set_strict_mode(True)
+        omcore.SoftwareVersion.set_strict_mode(True)
         return cls(
             id=client.uuid_from_uri(svo.id),
             software_name=svo.name,
@@ -563,10 +563,10 @@ class SoftwareVersion(BaseModel):
         )
 
     def to_kg_object(self, client):
-        KGSoftwareVersion.set_strict_mode(False)
-        obj = KGSoftwareVersion(name=self.software_name, alias=self.software_name,
+        omcore.SoftwareVersion.set_strict_mode(False)
+        obj = omcore.SoftwareVersion(name=self.software_name, alias=self.software_name,
                                 version_identifier=self.software_version)
-        KGSoftwareVersion.set_strict_mode(True)
+        omcore.SoftwareVersion.set_strict_mode(True)
         return obj
 
 
@@ -600,11 +600,11 @@ class ComputationalEnvironment(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return KGComputationalEnvironment(
+        return omcmp.Environment(
             name=self.name,
-            hardware=KGHardwareSystem(name=self.hardware.value, version="not specified"),
-            configuration=[conf.to_kg_object(client) for conf in self.configuration],
-            software=[sv.to_kg_object(client) for sv in self.software],
+            hardware=HARDWARE_SYSTEMS[self.hardware.value],
+            configuration=[conf.to_kg_object(client) for conf in as_list(self.configuration)],
+            software=[sv.to_kg_object(client) for sv in as_list(self.software)],
             description=self.description
         )
 
@@ -658,7 +658,7 @@ class LaunchConfiguration(BaseModel):
             env_vars = self.environment_variables.to_kg_object(client)
         if self.name is None:
             self.name = f"LaunchConfiguration-{self.identifier}"
-        return KGLaunchConfiguration(
+        return omcmp.LaunchConfiguration(
             name=self.name,
             description=self.description,
             executable=self.executable,
@@ -683,6 +683,7 @@ class Computation(BaseModel):
     status: Status = None
     resource_usage: List[ResourceUsage] = None
     tags: List[str] = None
+    description: str = None
 
 
 class ComputationPatch(Computation):
@@ -717,4 +718,4 @@ class ModelVersionReference(BaseModel):
         return cls(model_version_id=UUID(model_version.uuid))
 
     def to_kg_object(self, client):
-        return KGModelVersion.from_uuid(str(self.model_version_id), client, scope="in progress")
+        return omcore.ModelVersion.from_uuid(str(self.model_version_id), client, scope="in progress")

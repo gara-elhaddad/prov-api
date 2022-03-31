@@ -545,3 +545,4 @@ class TestCreateSimulation:
                                     json=data,
                                     headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 201
+

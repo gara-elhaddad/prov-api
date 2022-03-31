@@ -21,7 +21,7 @@ docstring goes here
 
 import logging
 from uuid import UUID
-from typing import Union
+from typing import Union, Literal
 
 
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ from ..common.data_models import (
     ComputationPatch,
     SoftwareVersion,
     ModelVersionReference,
+    ComputationType
 )
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -40,6 +41,7 @@ logger = logging.getLogger("ebrains-prov-api")
 class Optimisation(Computation):
     input: Union[File, ModelVersionReference, SoftwareVersion]
     output: Union[File, ModelVersionReference]
+    type: Literal["optimization"]
 
 
 class OptimisationPatch(ComputationPatch):

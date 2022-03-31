@@ -2,6 +2,7 @@
 EXAMPLES = {
     "DataAnalysis": {
         "id": "00000000-0000-0000-0000-000000000000",
+        "type": "data analysis",
         "input": [
             {
                 "description": "Demonstration data for validation framework",

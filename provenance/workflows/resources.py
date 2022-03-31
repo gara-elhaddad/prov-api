@@ -31,7 +31,7 @@ from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
 from ..common.utils import create_computation, delete_computation
-from .data_models import Workflow
+from .data_models import WorkflowExecution
 from .. import settings
 
 
@@ -41,7 +41,7 @@ auth = HTTPBearer()
 router = APIRouter()
 
 
-@router.get("/workflows/", response_model=List[Workflow])
+@router.get("/workflows/", response_model=List[WorkflowExecution])
 def query_workflows(
     tags: List[str] = Query(None, description="Return workflows with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),
@@ -58,19 +58,19 @@ def query_workflows(
     pass
 
 
-@router.post("/workflows/", response_model=Workflow, status_code=status.HTTP_201_CREATED)
+@router.post("/workflows/", response_model=WorkflowExecution, status_code=status.HTTP_201_CREATED)
 def store_recorded_workflow(
-    workflow: Workflow, 
+    workflow: WorkflowExecution, 
     space: str = "myspace",
     token: HTTPAuthorizationCredentials = Depends(auth)
 ):
     """
     Store a new record of a workflow execution in the Knowledge Graph.
     """
-    return create_computation(Workflow, omcmp.WorkflowExecution, workflow, space, token)
+    return create_computation(WorkflowExecution, omcmp.WorkflowExecution, workflow, space, token)
 
 
-@router.get("/workflows/{workflow_id}", response_model=Workflow)
+@router.get("/workflows/{workflow_id}", response_model=WorkflowExecution)
 def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Retrieve a specific record of a workflow execution from the Knowledge Graph, identified by its ID.

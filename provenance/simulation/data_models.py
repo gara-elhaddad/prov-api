@@ -21,20 +21,14 @@ docstring goes here
 import logging
 from enum import Enum
 from uuid import UUID, uuid4
-from typing import List, Union
+from typing import List, Union, Literal
 
 from pydantic import Field
 
 from fairgraph.base_v3 import KGProxy
 from fairgraph.utility import as_list
-from fairgraph.openminds.computation import Simulation as KGSimulation
-from fairgraph.openminds.controlledterms import ActionStatusType
-from fairgraph.openminds.core import (
-    Person as KGPerson,
-    File as KGFile,
-    SoftwareVersion as KGSoftwareVersion,
-    ModelVersion as KGModelVersion
-)
+import fairgraph.openminds.computation as omcmp
+import fairgraph.openminds.core as omcore
 
 from ..common.data_models import (
     File,
@@ -48,7 +42,8 @@ from ..common.data_models import (
     LaunchConfiguration,
     ComputationalEnvironment,
     ACTION_STATUS_TYPES,
-    status_name_map
+    status_name_map,
+    ComputationType
 )
 
 
@@ -70,10 +65,12 @@ class Simulator(str, Enum):
 
 class Simulation(Computation):
     """Record of a numerical simulation"""
-    kg_cls = KGSimulation
+    kg_cls = omcmp.Simulation
 
     input: List[Union[File, ModelVersionReference, SoftwareVersion]] = Field(...,
         description="Inputs to this simulation (models, data files, configuration files and/or code)")
+    type: Literal["simulation"]
+
     # informed_by: "SimulationNew" = None
 
     class Config:
@@ -86,16 +83,17 @@ class Simulation(Computation):
         for obj in as_list(dao.inputs):
             if isinstance(obj, KGProxy):
                 obj = obj.resolve(client, scope="in progress")
-            if isinstance(obj, KGFile):
+            if isinstance(obj, (omcore.File, omcore.LocalFile)):
                 inputs.append(File.from_kg_object(obj, client))
-            elif isinstance(obj, KGSoftwareVersion):
+            elif isinstance(obj, omcore.SoftwareVersion):
                 inputs.append(SoftwareVersion.from_kg_object(obj, client))
-            elif isinstance(obj, KGModelVersion):
+            elif isinstance(obj, omcore.ModelVersion):
                 inputs.append(ModelVersionReference.from_kg_object(obj, client))
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(obj)}")
         return cls(
             id=client.uuid_from_uri(dao.id),
+            type=cls.__fields__["type"].type_.__args__[0],
             input=inputs,
             output=[File.from_kg_object(obj, client) for obj in as_list(dao.outputs)],
             environment=ComputationalEnvironment.from_kg_object(dao.environment, client),
@@ -112,7 +110,7 @@ class Simulation(Computation):
         if self.started_by:
             started_by = self.started_by.to_kg_object(client)
         else:
-            started_by = KGPerson.me(client)  # todo
+            started_by = omcore.Person.me(client)  # todo
         inputs = [inp.to_kg_object(client) for inp in self.input]
         outputs = [outp.to_kg_object(client) for outp in self.output]
         environment = self.environment.to_kg_object(client)
