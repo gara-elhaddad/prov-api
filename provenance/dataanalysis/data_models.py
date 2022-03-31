@@ -45,7 +45,7 @@ class DataAnalysis(Computation):
 
     @classmethod
     def from_kg_object(cls, data_analysis_object, client):
-        obj = data_analysis_object.resolve(client)
+        obj = data_analysis_object.resolve(client, scope="in progress")
         inputs = []
         for input in as_list(obj.inputs):
             if isinstance(input, KGProxy):

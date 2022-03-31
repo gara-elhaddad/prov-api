@@ -67,7 +67,7 @@ class WorkflowExecution(BaseModel):
             omcmp.Optimization: Optimisation
         }
         stages = [
-            cls_map[stage.__class__].from_kg_object(stage, client)
+            cls_map[stage.cls].from_kg_object(stage, client)
             for stage in weo.stages
         ]
         return cls(

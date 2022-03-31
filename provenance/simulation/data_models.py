@@ -78,7 +78,7 @@ class Simulation(Computation):
 
     @classmethod
     def from_kg_object(cls, simulation_object, client):
-        dao = simulation_object.resolve(client)
+        dao = simulation_object.resolve(client, scope="in progress")
         inputs = []
         for obj in as_list(dao.inputs):
             if isinstance(obj, KGProxy):
