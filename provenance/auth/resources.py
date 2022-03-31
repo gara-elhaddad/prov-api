@@ -47,20 +47,20 @@ async def login_via_ebrains(request: Request):
 @router.get("/auth")
 async def auth_via_ebrains(request: Request):
     token = await oauth.ebrains.authorize_access_token(request)
-    #user = await oauth.ebrains.parse_id_token(request, token)
     user = token["userinfo"]
-    #user2 = await oauth.ebrains.userinfo(token=token)
-    #user.update(user2)
-    response = {
-        "access_token": token["access_token"],
-        "user": {
-            "name": user["name"],
-            "user_id_v1": user.get("mitreid-sub"),
-            "username": user["preferred_username"],
-            "given_name": user["given_name"],
-            "family_name": user["family_name"]
-            # todo: add group info
-        },
-    }
+    # now get information about group/team memberships
+    user2 = await oauth.ebrains.userinfo(token=token)
+    user.update(user2)
+    # response = {
+    #     "access_token": token["access_token"],
+    #     "user": {
+    #         "name": user["name"],
+    #         "user_id_v1": user.get("mitreid-sub"),
+    #         "username": user["preferred_username"],
+    #         "given_name": user["given_name"],
+    #         "family_name": user["family_name"]
+    #         # todo: add group info
+    #     },
+    # }
     full_response = {"token": token, "user": user}
     return full_response
