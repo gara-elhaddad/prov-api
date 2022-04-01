@@ -60,7 +60,7 @@ def query_workflows(
     kg_client = get_kg_client_for_user_account(token.credentials)
     filters = {}
     if recipe_id:
-        filters["recipe_id"] = str(recipe_id)
+        filters["recipe"] = recipe_id
     # todo: handle tags
     workflows = omcmp.WorkflowExecution.list(
         kg_client, scope="in progress", space=space,

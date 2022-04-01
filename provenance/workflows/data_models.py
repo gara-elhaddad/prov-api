@@ -87,7 +87,7 @@ class WorkflowExecution(BaseModel):
             started_by = omcore.Person.me(client)
         stages = [stage.to_kg_object(client) for stage in self.stages]
         if self.recipe_id:
-            recipe = omcmp.WorkflowRecipe.from_id(str(self.recipe_id), client, scope="in progress")  # todo: also search scope="released"
+            recipe = omcmp.WorkflowRecipeVersion.from_id(str(self.recipe_id), client, scope="in progress")  # todo: also search scope="released"
         else:
             recipe = None
         # todo: error message if recipe is not found
