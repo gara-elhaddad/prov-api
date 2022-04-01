@@ -10,7 +10,7 @@ from . import (
     optimisation,
     workflows,
     auth,
-    vocab,
+    statistics,
 )
 
 description = """
@@ -39,10 +39,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(workflows.router, tags=["Workflows"])
+app.include_router(statistics.router, tags=["Statistics"])
 app.include_router(simulation.router, tags=["Simulations"])
 app.include_router(dataanalysis.router, tags=["Data analysis"])
 app.include_router(visualisation.router, tags=["Visualisation"])
 app.include_router(optimisation.router, tags=["Optimisation"])
-app.include_router(workflows.router, tags=["Workflows"])
 app.include_router(auth.router, tags=["Authentication and authorization"])
 #app.include_router(vocab.router, tags=["Controlled vocabularies"])
