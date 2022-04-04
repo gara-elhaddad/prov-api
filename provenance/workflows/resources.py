@@ -89,7 +89,7 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="in progress")
-    return omcmp.WorkflowExecution.from_kg_object(workflow_object, kg_client)
+    return WorkflowExecution.from_kg_object(workflow_object, kg_client)
 
 
 @router.delete("/workflows/{workflow_id}")

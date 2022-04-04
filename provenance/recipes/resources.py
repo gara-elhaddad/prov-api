@@ -41,7 +41,7 @@ router = APIRouter()
 
 
 @router.get("/recipes/", response_model=List[WorkflowRecipe])
-def query_recipes(
+def query_workflow_recipes(
     space: str = Query("myspace", description="Knowledge Graph space to search in"),
     size: int = Query(100, description="Number of records to return"),
     from_index: int = Query(0, description="Index of the first record to return"),
@@ -55,7 +55,19 @@ def query_recipes(
     or that are associated with a collab of which the user is a member.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    workflows = omcmp.WorkflowRecipeVersion.list(
+    recipes = omcmp.WorkflowRecipeVersion.list(
         kg_client, scope="in progress", space=space,
         from_index=from_index, size=size)
-    return [WorkflowRecipe.from_kg_object(wf, kg_client) for wf in workflows]
+    return [WorkflowRecipe.from_kg_object(rcp, kg_client) for rcp in recipes]
+
+
+@router.get("/recipes/{recipe_id}", response_model=WorkflowRecipe)
+def get_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
+    """
+    Retrieve a workflow recipe (aka workflow description) from the Knowledge Graph, identified by its ID.
+
+    You may only retrieve public recipes, recipes that you created, or recipes associated with a collab which you can view.
+    """
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="in progress")
+    return WorkflowRecipe.from_kg_object(recipe_object, kg_client)
