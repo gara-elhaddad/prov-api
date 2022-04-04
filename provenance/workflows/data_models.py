@@ -24,6 +24,7 @@ from typing_extensions import Annotated
 
 from pydantic import BaseModel, Field
 
+from fairgraph.base_v3 import KGProxy
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 from ..common.data_models import Person
@@ -66,8 +67,13 @@ class WorkflowExecution(BaseModel):
             omcmp.Simulation: Simulation,
             omcmp.Optimization: Optimisation
         }
+        def get_class(obj):
+            if isinstance(obj, KGProxy):
+                return obj.cls
+            else:
+                return obj.__class__
         stages = [
-            cls_map[stage.cls].from_kg_object(stage, client)
+            cls_map[get_class(stage)].from_kg_object(stage, client)
             for stage in weo.stages
         ]
         return cls(
