@@ -9,6 +9,7 @@ from . import (
     visualisation,
     optimisation,
     workflows,
+    recipes,
     auth,
     statistics,
 )
@@ -39,7 +40,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(workflows.router, tags=["Workflows"])
+app.include_router(recipes.router, tags=["Workflow Recipes"])
+app.include_router(workflows.router, tags=["Workflow Executions"])
 app.include_router(statistics.router, tags=["Statistics"])
 app.include_router(simulation.router, tags=["Simulations"])
 app.include_router(dataanalysis.router, tags=["Data analysis"])
