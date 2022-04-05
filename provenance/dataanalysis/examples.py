@@ -35,7 +35,7 @@ EXAMPLES = {
         ],
         "environment": {
             "name": "SpiNNaker default 2021-10-13",
-            "hardware": "spinnaker",
+            "hardware": "SpiNNaker",
             "configuration": [
                 {
                     "items": [

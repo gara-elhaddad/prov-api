@@ -15,10 +15,7 @@ from . import (
 )
 
 description = """
-This is a work in progress.
-
-Many of the endpoints work, but not all features have been implemented,
-in particular filter terms for computation queries, and more testing is needed.
+This is a first release candidate, more testing is needed before the first release.
 
 At present, all metadata are saved in the pre-production version of the KG,
 which is reset from time-to-time, and so metadata will not be preserved long-term:

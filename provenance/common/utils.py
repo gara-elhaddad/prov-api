@@ -14,8 +14,8 @@ def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
         if kg_computation_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"A data analysis with id {pydantic_obj.id} already exists. "
-                        "The POST endpoint cannot be used to modify an existing data analysis record.",
+                detail=f"A computation with id {pydantic_obj.id} already exists. "
+                        "The POST endpoint cannot be used to modify an existing computation record.",
             )
     pydantic_obj.id = uuid4()
     kg_computation_object = pydantic_obj.to_kg_object(kg_client)

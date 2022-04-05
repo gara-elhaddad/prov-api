@@ -19,19 +19,20 @@ docstring goes here
 """
 
 from typing import List
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime
 import logging
 
+from fairgraph.base_v3 import as_list
 import fairgraph.openminds.computation as omcmp
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
-from ..common.utils import create_computation, delete_computation
-from .data_models import WorkflowRecipe
+from ..common.utils import patch_computation, delete_computation
+from .data_models import WorkflowRecipe, WorkflowRecipePatch
 
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -71,3 +72,77 @@ def get_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = D
     kg_client = get_kg_client_for_user_account(token.credentials)
     recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="in progress")
     return WorkflowRecipe.from_kg_object(recipe_object, kg_client)
+
+
+@router.post("/recipes/", response_model=WorkflowRecipe, status_code=status_codes.HTTP_201_CREATED)
+def create_workflow_recipe(
+    recipe: WorkflowRecipe,
+    space: str = "myspace",
+    token: HTTPAuthorizationCredentials = Depends(auth)
+):
+    """
+    Store a new recipe, or a new version of an existing recipe, in the Knowledge Graph.
+    """
+    kg_client = get_kg_client_for_user_account(token.credentials)
+    if recipe.id is not None:
+        kg_recipe_version = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe.id), kg_client, scope="in progress")
+        if kg_recipe_version is not None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_400_BAD_REQUEST,
+                detail=f"A workflow recipe version with id {recipe.id} already exists. "
+                        "The POST endpoint cannot be used to modify an existing version of a workflow recipe.",
+            )
+    recipe.id = uuid4()
+    kg_recipe_version = recipe.to_kg_object(kg_client)
+    # try to figure out if this is a new version of an existing recipe
+    # todo in future: also search released workflow recipes
+    related_workflows = omcmp.WorkflowRecipeVersion.list(kg_client, space=space, 
+                                                         scope="in progress",
+                                                         name=recipe.name)
+    # kg search doesn't do exact match for name, so need to filter further
+    alternative_versions = sorted(
+        [wfv for wfv in as_list(related_workflows) if wfv.name == recipe.name],
+        key=lambda wfv: wfv.version_identifier
+    )
+    if alternative_versions:
+        parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
+                                                    versions=alternative_versions[-1])
+        assert len(parent_workflow) == 1
+        parent_workflow.versions.append(kg_recipe_version)
+        kg_recipe_version.is_new_version_of = alternative_versions[-1]
+    else:
+        parent_workflow = omcmp.WorkflowRecipe(
+            name=kg_recipe_version.name, 
+            alias=kg_recipe_version.alias, 
+            description=kg_recipe_version.description,
+            developers=kg_recipe_version.developers,
+            versions=[kg_recipe_version])
+    kg_recipe_version.save(kg_client, space=space, recursive=True)
+    parent_workflow.save(kg_client, space=space, recursive=False)
+    return WorkflowRecipe.from_kg_object(kg_recipe_version, kg_client)
+
+
+@router.patch("/recipes/{recipe_id}", response_model=WorkflowRecipe)
+def update_workflow_recipe(
+    recipe_id: UUID,
+    patch: WorkflowRecipePatch,
+    token: HTTPAuthorizationCredentials = Depends(auth),
+):
+    """
+    Modify part of the metadata in a workflow recipe.
+
+    You may only update records in your private space,
+    or that are associated with a collab of which you are an administrator.
+    """
+    return patch_computation(WorkflowRecipe, omcmp.WorkflowRecipeVersion, recipe_id, patch, token)
+
+
+@router.delete("/recipes/{recipe_id}")
+def delete_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
+    """
+    Delete a workflow recipe.
+
+    You may only delete recipes in your private space,
+    or that are associated with a collab of which you are an administrator.
+    """
+    return delete_computation(omcmp.WorkflowRecipeVersion, recipe_id, token)

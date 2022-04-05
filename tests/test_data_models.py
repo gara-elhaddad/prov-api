@@ -15,12 +15,14 @@ sys.path.append(".")
 from provenance.common.data_models import ResourceUsage, get_repository_iri
 from provenance.dataanalysis.data_models import DataAnalysis
 from provenance.visualisation.data_models import Visualisation
+from provenance.optimisation.data_models import Optimisation
 from provenance.simulation.data_models import Simulation
 from provenance.workflows.data_models import WorkflowExecution
 import provenance.common.examples
 import provenance.simulation.examples
 import provenance.dataanalysis.examples
 import provenance.visualisation.examples
+import provenance.optimisation.examples
 import provenance.workflows.examples
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
@@ -31,6 +33,7 @@ from fairgraph.base_v3 import IRI
 EXAMPLES = provenance.common.examples.EXAMPLES
 EXAMPLES.update(provenance.dataanalysis.examples.EXAMPLES)
 EXAMPLES.update(provenance.visualisation.examples.EXAMPLES)
+EXAMPLES.update(provenance.optimisation.examples.EXAMPLES)
 EXAMPLES.update(provenance.simulation.examples.EXAMPLES)
 EXAMPLES.update(provenance.workflows.examples.EXAMPLES)
 
@@ -140,7 +143,7 @@ class TestDataAnalysis:
         environment = omcmp.Environment(
             id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000",
             name="SpiNNaker default 2021-10-13",
-            hardware=omcmp.HardwareSystem(name="spinnaker"),
+            hardware=omcmp.HardwareSystem(name="SpiNNaker"),
             configuration=omcore.ParameterSet(
                     parameters=[
                         omcore.StringParameter(name="parameter1", value="value1"),
@@ -208,6 +211,14 @@ class TestSimulation:
         pydantic_obj = parse_obj_as(Simulation, EXAMPLES["Simulation"])
         kg_client = MockKGClient()
         kg_objects = pydantic_obj.to_kg_object(kg_client)
+
+
+class TestOptimisation:
+
+    def test_conversion_to_kg_objects(self):
+        pydantic_obj = parse_obj_as(Optimisation, EXAMPLES["Optimisation"])
+        #kg_client = MockKGClient()
+        #kg_objects = pydantic_obj.to_kg_object(kg_client)
 
 
 class TestWorkflow:

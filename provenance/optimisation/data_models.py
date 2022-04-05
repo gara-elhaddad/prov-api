@@ -3,7 +3,7 @@ docstring goes here
 """
 
 """
-   Copyright 2021 CNRS
+   Copyright 2022 CNRS
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,29 +21,30 @@ docstring goes here
 
 import logging
 from uuid import UUID
-from typing import Union, Literal
-
-
-from pydantic import BaseModel
+from typing import Union, Literal, List
+from fairgraph.openminds.computation import Optimization as KGOptimization
 
 from ..common.data_models import (
     File,
     Computation,
     ComputationPatch,
     SoftwareVersion,
-    ModelVersionReference,
-    ComputationType
+    ModelVersionReference
 )
 
 logger = logging.getLogger("ebrains-prov-api")
 
 
 class Optimisation(Computation):
-    input: Union[File, ModelVersionReference, SoftwareVersion]
-    output: Union[File, ModelVersionReference]
+    """Record of an optimization"""
+    kg_cls = KGOptimization
+
+    input: List[Union[File, ModelVersionReference, SoftwareVersion]]
+    output: List[Union[File, ModelVersionReference]]
     type: Literal["optimization"]
 
 
 class OptimisationPatch(ComputationPatch):
-    input: Union[File, ModelVersionReference, SoftwareVersion] = None
-    output: Union[File, ModelVersionReference] = None
+    """Correction of or update to a record of an optimisation"""
+    input: List[Union[File, ModelVersionReference, SoftwareVersion]] = None
+    output: List[Union[File, ModelVersionReference]] = None

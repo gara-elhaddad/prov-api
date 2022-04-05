@@ -90,3 +90,18 @@ class WorkflowRecipe(BaseModel):
 
     def to_kg_object(self, client):
         raise NotImplementedError
+
+
+class WorkflowRecipePatch(BaseModel):
+    name: str = None
+    alias: str = None
+    custodians: List[Person] = None
+    description: str = None
+    developers: List[Person] = None
+    type: WorkflowRecipeType = None   # temporarily allow none, until new content types added
+    full_documentation: AnyHttpUrl = None
+    homepage: AnyHttpUrl = None
+    keywords: List[str] = None
+    location: AnyUrl
+    version_identifier: str
+    version_innovation: str = None

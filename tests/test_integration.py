@@ -145,17 +145,15 @@ def model_version_obj():
 
 @pytest.fixture(scope="module")
 def hardware_obj():
-    obj = omcmp.HardwareSystem(id=f"{ID_PREFIX}/{uuid4()}", name="openstack_cscs", version="2")
-    obj.save(kg_client, space=TEST_SPACE)
-    yield obj
-    obj.delete(kg_client)
+    obj = omcmp.HardwareSystem.by_name("CSCS Castor", kg_client, scope="in progress", space="common")
+    return obj
 
 
 @pytest.fixture(scope="module")
 def environment_obj(software_version_objs, hardware_obj):
     obj = omcmp.Environment(
         id=f"{ID_PREFIX}/{uuid4()}",
-        name="Some hardware that doesn't really exist",
+        name="Some environment that doesn't really exist",
         hardware=hardware_obj,
         configuration=omcore.ParameterSet(
                 parameters=[
@@ -266,6 +264,7 @@ class TestGetDataAnalysis:
                                 headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         expected = {
+            "description": None,
             "end_time": "2021-05-28T18:32:58.597000+00:00",
             "environment": {"configuration": [{"description": "hardware configuration for "
                                             "fake hardware",
@@ -274,9 +273,9 @@ class TestGetDataAnalysis:
                                                         {"name": "parameter2",
                                                         "value": "value2"}]}],
                             "description": "Default environment on fake hardware",
-                            "hardware": "openstack_cscs",
+                            "hardware": "CSCS Castor",
                             "id": environment_obj.uuid,
-                            "name": "Some hardware that doesn't really exist",
+                            "name": "Some environment that doesn't really exist",
                             "software": [
                                 {"id": obj.uuid, "software_name": obj.name, "software_version": obj.version_identifier}
                                 for obj in software_version_objs[1:4]
@@ -312,7 +311,9 @@ class TestGetDataAnalysis:
                         "given_name": "Bilbo",
                         "orcid": "http://orcid.org/0000-0002-4793-7541"},
             "status": "queued",
-            "tags": ["string"]}
+            "tags": ["string"],
+            "type": "data analysis"
+        }
 
         assert response.json() == expected
 
@@ -356,11 +357,12 @@ class TestGetDataAnalysis:
 
     def test_query_data_analysis_by_platform(self, data_analysis_obj):
         token = kg_client._kg_client.token_handler.get_token()
-        response = test_client.get(f"/analyses/?platform=openstack_cscs&space={TEST_SPACE}",
+        response = test_client.get(f"/analyses/?platform=cscscastor&space={TEST_SPACE}",
                                 headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 200                         
         data = response.json()
         assert len(data) > 0
-        assert all(item["environment"]["hardware"] == "openstack_cscs" for item in data)
+        assert all(item["environment"]["hardware"] == "CSCS Castor" for item in data)
 
     def test_query_data_analysis_by_status(self, data_analysis_obj, input_file_obj):
         token = kg_client._kg_client.token_handler.get_token()
@@ -419,7 +421,7 @@ class TestGetVisualisation:
                                                         {"name": "parameter2",
                                                         "value": "value2"}]}],
                             "description": "Default environment on fake hardware",
-                            "hardware": "openstack_cscs",
+                            "hardware": "CSCS Castor",
                             "id": environment_obj.uuid,
                             "name": "Some hardware that doesn't really exist",
                             "software": [

@@ -52,7 +52,7 @@ EXAMPLES = {
         ],
         "environment": {
             "name": "EBRAINS Lab 20211028",
-            "hardware": "openstack_cscs",
+            "hardware": "CSCS Castor",
             "configuration": [],
             "software": [
                 {

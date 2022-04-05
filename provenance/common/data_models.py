@@ -346,36 +346,8 @@ HARDWARE_SYSTEMS = _get_hardware_systems()
 
 HardwareSystem = Enum(
     "HardwareSystem",
-    [(name, name) for name in HARDWARE_SYSTEMS]
+    [(name.lower().replace(" ", ""), name) for name in HARDWARE_SYSTEMS]
 )
-
-
-# class HardwareSystem(str, Enum):
-#     """Computer hardware system
-
-#     "spinnaker":     the SpiNNaker 600 board machine at University of Manchester
-#     "spinnaker4":    a SpiNNaker 4-chip board
-#     "spinnaker48":   a SpiNNaker 48-chip board
-#     "brainscales1":  the BrainScaleS-1 system at Heidelberg University
-#     "pizdaint":      Piz Daint (CSCS)
-#     "jusuf":         JUSUF (JSC)
-#     "galileo"        Galileo100 (CINECA)
-#     "openstack_cscs" OpenStack VMs at CSCS
-#     "openstack_jsc"  OpenStack VMs at JSC
-#     "generic"        any hardware system not specified above
-
-#     """
-
-#     spinnaker = "spinnaker"  # the SpiNNaker 600 board machine at University of Manchester"
-#     spinnaker4 = "spinnaker4"  # a SpiNNaker 4-chip board"
-#     spinnaker48 = "spinnaker48"  # a SpiNNaker 48-chip board"
-#     brainscales1 = "brainscales1"  # the BrainScaleS-1 system at Heidelberg University"
-#     pizdaint = "pizdaint"  # Piz Daint (CSCS)"
-#     jusuf = "jusuf"  # "JUSUF (JSC)"
-#     galileo100 = "galileo"  # Galileo100 (CINECA)"
-#     openstack_cscs = "openstack_cscs"
-#     openstack_jsc = "openstack_jsc"
-#     generic = "generic"
 
 
 class StringParameter(BaseModel):
@@ -590,10 +562,14 @@ class ComputationalEnvironment(BaseModel):
     @classmethod
     def from_kg_object(cls, env_object, client):
         env = env_object.resolve(client, scope="in progress")
+        if env.hardware:
+            hardware = HardwareSystem(env.hardware.resolve(client, scope="in progress").name)
+        else:
+            hardware = None
         return cls(
             id=client.uuid_from_uri(env.id),
             name=env.name,
-            hardware=getattr(HardwareSystem, env.hardware.resolve(client, scope="in progress").name),
+            hardware=hardware,
             configuration=[ParameterSet.from_kg_object(obj, client) for obj in as_list(env.configuration)],
             software=[SoftwareVersion.from_kg_object(obj, client) for obj in as_list(env.software)],
             description=env.description
