@@ -57,7 +57,7 @@ def query_workflow_recipes(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     recipes = omcmp.WorkflowRecipeVersion.list(
-        kg_client, scope="in progress", space=space,
+        kg_client, scope="in progress", space=space, api="core",
         from_index=from_index, size=size)
     return [WorkflowRecipe.from_kg_object(rcp, kg_client) for rcp in recipes]
 
