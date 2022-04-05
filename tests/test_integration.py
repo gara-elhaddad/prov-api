@@ -357,7 +357,7 @@ class TestGetDataAnalysis:
 
     def test_query_data_analysis_by_platform(self, data_analysis_obj):
         token = kg_client._kg_client.token_handler.get_token()
-        response = test_client.get(f"/analyses/?platform=cscscastor&space={TEST_SPACE}",
+        response = test_client.get(f"/analyses/?platform=CSCS%20Castor&space={TEST_SPACE}",
                                 headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200                         
         data = response.json()
@@ -413,6 +413,7 @@ class TestGetVisualisation:
                                 headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         expected = {
+            "description": None,
             "end_time": "2021-06-28T16:33:27+00:00",
             "environment": {"configuration": [{"description": "hardware configuration for "
                                             "fake hardware",
@@ -423,7 +424,7 @@ class TestGetVisualisation:
                             "description": "Default environment on fake hardware",
                             "hardware": "CSCS Castor",
                             "id": environment_obj.uuid,
-                            "name": "Some hardware that doesn't really exist",
+                            "name": "Some environment that doesn't really exist",
                             "software": [
                                 {"id": obj.uuid, "software_name": obj.name, "software_version": obj.version_identifier}
                                 for obj in software_version_objs[1:4]
@@ -459,7 +460,9 @@ class TestGetVisualisation:
                         "given_name": "Bilbo",
                         "orcid": "http://orcid.org/0000-0002-4793-7541"},
             "status": "queued",
-            "tags": ["string"]}
+            "tags": ["string"],
+            "type": "visualization"
+        }
 
         assert response.json() == expected
 
@@ -540,7 +543,8 @@ class TestCreateSimulation:
                 "given_name": person_obj.given_name,
                 "orcid": person_obj.digital_identifiers[0].identifier},
             "status": "queued",
-            "tags": ["ham", "eggs"]
+            "tags": ["ham", "eggs"],
+            "type": "simulation"
         }
         token = kg_client._kg_client.token_handler.get_token()
         response = test_client.post(f"/simulations/",

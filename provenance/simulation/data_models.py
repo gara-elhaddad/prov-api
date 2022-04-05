@@ -83,7 +83,7 @@ class Simulation(Computation):
         for obj in as_list(dao.inputs):
             if isinstance(obj, KGProxy):
                 obj = obj.resolve(client, scope="in progress")
-            if isinstance(obj, (omcore.File, omcore.LocalFile)):
+            if isinstance(obj, (omcore.File, omcmp.LocalFile)):
                 inputs.append(File.from_kg_object(obj, client))
             elif isinstance(obj, omcore.SoftwareVersion):
                 inputs.append(SoftwareVersion.from_kg_object(obj, client))

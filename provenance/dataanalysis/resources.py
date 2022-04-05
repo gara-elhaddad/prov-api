@@ -111,7 +111,7 @@ def query_analyses(
         filters["environment"].extend(as_list(environments))
     # filter by hardware platform
     if platform:
-        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space=space)
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space="common")
         # todo: handle different versions of hardware platforms
         environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
         filters["environment"].extend(as_list(environments))
