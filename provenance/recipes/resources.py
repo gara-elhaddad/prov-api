@@ -108,6 +108,7 @@ def create_workflow_recipe(
         parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
                                                     versions=alternative_versions[-1])
         assert len(parent_workflow) == 1
+        parent_workflow = parent_workflow[0]
         parent_workflow.versions.append(kg_recipe_version)
         kg_recipe_version.is_new_version_of = alternative_versions[-1]
     else:

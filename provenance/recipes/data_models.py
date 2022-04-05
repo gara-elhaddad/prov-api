@@ -5,10 +5,13 @@ from enum import Enum
 from uuid import UUID
 from pydantic import AnyHttpUrl, AnyUrl, BaseModel, Field
 
-from fairgraph.base_v3 import as_list
+from fairgraph.base_v3 import as_list, IRI
 import fairgraph.openminds.core as omcore
+import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
-from ..common.data_models import Person
+from ..common.data_models import (Person, get_repository_host, get_repository_iri,
+                                  get_repository_name, get_repository_type)
+from ..common.utils import invert_dict
 
 
 class WorkflowRecipeType(str, Enum):
@@ -89,7 +92,43 @@ class WorkflowRecipe(BaseModel):
         )
 
     def to_kg_object(self, client):
-        raise NotImplementedError
+        content_type_name = invert_dict(content_type_lookup).get(self.type, None)
+        if content_type_name:
+            format = omterms.ContentType.by_name(content_type_name, client)
+        else:
+            format = None
+        return omcmp.WorkflowRecipeVersion(
+            name=self.name,
+            alias=self.alias,
+            #accessibility',
+            #copyright',
+            custodians=[p.to_kg_object(client) for p in self.custodians],
+            description=self.description,
+            developers=[p.to_kg_object(client) for p in self.developers],
+            #digital_identifier',
+            format=format,
+            full_documentation=self.full_documentation,
+            #funding',
+            #has_components',
+            homepage=omcore.URL(url=self.homepage),
+            #how_to_cite',
+            #is_alternative_version_of',
+            #is_new_version_of',
+            keywords=self.keywords,
+            #licenses',
+            #other_contributions',
+            #related_publications',
+            #release_date',
+            repository=omcore.FileRepository(
+                name=get_repository_name(self.location),
+                iri=get_repository_iri(self.location),
+                hosted_by=get_repository_host(self.location),
+                repository_type=get_repository_type(self.location),
+            ),
+            #support_channels',
+            version_identifier=self.version_identifier,
+            version_innovation=self.version_innovation
+        )
 
 
 class WorkflowRecipePatch(BaseModel):

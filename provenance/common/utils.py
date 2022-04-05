@@ -73,3 +73,7 @@ def delete_computation(fairgraph_cls, computation_id, token):
                    "or in collab spaces for which you are an administrator."
         )
     kg_computation_object.delete(kg_client)
+
+
+def invert_dict(D):
+    return {value: key for key, value in D.items()}

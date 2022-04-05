@@ -182,12 +182,14 @@ def get_repository_host(url):
 CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.]+)/(?P<path>\S*)"
 GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<site>\w+)/(?P<project_name>[\w-]+)/(?P<path>\S*)"
 EBRAINS_Gitlab_pattern = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)/-/"
+EBRAINS_Gitlab_pattern2 = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)"
 
 def get_repository_iri(url):
     templates = (
         (CSCS_pattern, "https://object.cscs.ch/v1/{proj}/{container_name}"),
         (GPFS_proxy_pattern, "https://gpfs-proxy.brainsimulation.eu/{site}/{project_name}"),
-        (EBRAINS_Gitlab_pattern, "https://gitlab.ebrains.eu/{org}/{project_name}")
+        (EBRAINS_Gitlab_pattern, "https://gitlab.ebrains.eu/{org}/{project_name}"),
+        (EBRAINS_Gitlab_pattern2, "https://gitlab.ebrains.eu/{org}/{project_name}"),
     )
     for pattern, template in templates:
         match = re.match(pattern, url)
@@ -203,7 +205,8 @@ def get_repository_name(url):
     templates = (
         (CSCS_pattern, "container_name"),
         (GPFS_proxy_pattern, "project_name"),
-        (EBRAINS_Gitlab_pattern, "project_name")
+        (EBRAINS_Gitlab_pattern, "project_name"),
+        (EBRAINS_Gitlab_pattern2, "project_name")
     )
     for pattern, key in templates:
         match = re.match(pattern, url)

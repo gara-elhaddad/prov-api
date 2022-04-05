@@ -488,7 +488,7 @@ class TestModifyVisualisation:
 class TestCreateSimulation:
 
     def test_post_simulation(self, person_obj, output_file_objs, software_version_objs,
-                            model_version_obj, environment_obj, launch_config_obj):
+                             model_version_obj, environment_obj, launch_config_obj):
         data = {
             "environment": {
                 "configuration": [{
@@ -547,8 +547,29 @@ class TestCreateSimulation:
             "type": "simulation"
         }
         token = kg_client._kg_client.token_handler.get_token()
-        response = test_client.post(f"/simulations/",
+        response = test_client.post("/simulations/",
                                     json=data,
                                     headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 201
 
+
+
+@pytest.mark.skipif(not have_kg_connection, reason=no_kg_err_msg)
+class TestCreateWorkflowRecipe:
+
+    def test_post_recipe(self, person_obj):
+        data = { 
+            "name": "PSD (Power Spectral Density) Calculation Workflow with input file from Knowledge Graph",
+            "alias": "PSD_workflow_KG",
+            "custodians": [{"given_name": person_obj.given_name, "family_name": person_obj.family_name}],
+            "description": "description goes here",
+            "developers": [{"given_name": person_obj.given_name, "family_name": person_obj.family_name}],
+            "homepage": "https://gitlab.ebrains.eu/technical-coordination/project-internal/workflows/cwl-workflows/-/tree/main/PSD_workflow_KG",
+            "location": "https://gitlab.ebrains.eu/technical-coordination/project-internal/workflows/cwl-workflows",
+            "version_identifier": "1b13278f"
+        }
+        token = kg_client._kg_client.token_handler.get_token()
+        response = test_client.post("/recipes/?space=collab-provenance-api-development",
+                                    json=data,
+                                    headers={"Authorization": f"Bearer {token}"})
+        assert response.status_code == 201
