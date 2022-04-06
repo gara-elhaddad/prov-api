@@ -98,7 +98,19 @@ def create_workflow_recipe(
     # todo in future: also search released workflow recipes
     alternative_versions = None
     parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
-                                                name=recipe.name)[0]
+                                                name=recipe.name)
+    if parent_workflow:
+        if len(parent_workflow) > 1:
+            # KG query returns not-exact matches, need to filter further
+            candidate_parents = [pwf for pwf in parent_workflow if pwf.name == recipe.name]
+            if len(candidate_parents) == 1:
+                parent_workflow = candidate_parents[0]
+            else:
+                parent_workflow = None
+        elif parent_workflow[0].name == recipe.name:
+            parent_workflow = parent_workflow[0]
+        else:
+            parent_workflow = None
     if parent_workflow:
         parent_workflow.resolve(kg_client, scope="in progress", follow_links=1)
         if parent_workflow.versions:
