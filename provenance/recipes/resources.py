@@ -96,21 +96,18 @@ def create_workflow_recipe(
     kg_recipe_version = recipe.to_kg_object(kg_client)
     # try to figure out if this is a new version of an existing recipe
     # todo in future: also search released workflow recipes
-    related_workflows = omcmp.WorkflowRecipeVersion.list(kg_client, space=space, 
-                                                         scope="in progress",
-                                                         name=recipe.name)
-    # kg search doesn't do exact match for name, so need to filter further
-    alternative_versions = sorted(
-        [wfv for wfv in as_list(related_workflows) if wfv.name == recipe.name],
-        key=lambda wfv: wfv.version_identifier
-    )
-    if alternative_versions:
-        parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
-                                                    versions=alternative_versions[-1])
-        assert len(parent_workflow) == 1
-        parent_workflow = parent_workflow[0]
-        parent_workflow.versions.append(kg_recipe_version)
-        kg_recipe_version.is_new_version_of = alternative_versions[-1]
+    alternative_versions = None
+    parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
+                                                name=recipe.name)[0]
+    if parent_workflow:
+        parent_workflow.resolve(kg_client, scope="in progress", follow_links=1)
+        if parent_workflow.versions:
+            alternative_versions = sorted(
+                as_list(parent_workflow.versions),
+                key=lambda wfv: wfv.version_identifier
+            )
+            kg_recipe_version.is_new_version_of = alternative_versions[-1]
+        parent_workflow.versions = as_list(parent_workflow.versions) + [kg_recipe_version]
     else:
         parent_workflow = omcmp.WorkflowRecipe(
             name=kg_recipe_version.name, 
