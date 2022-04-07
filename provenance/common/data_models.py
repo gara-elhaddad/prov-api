@@ -306,7 +306,10 @@ class File(BaseModel):
         else:
             # todo: if self.format is empty, we should try to infer it
             content_type = None
-        hash = omcore.Hash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
+        if self.hash:
+            hash = omcore.Hash(algorithm=self.hash.algorithm.value, digest=self.hash.value)
+        else:
+            hash = None
         if self.size is None:
             storage_size = None
         else:
