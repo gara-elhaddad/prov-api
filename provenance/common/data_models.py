@@ -179,7 +179,7 @@ def get_repository_host(url):
     return None
 
 
-CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.]+)/(?P<path>\S*)"
+CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.-]+)/(?P<path>\S*)"
 GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<site>\w+)/(?P<project_name>[\w-]+)/(?P<path>\S*)"
 EBRAINS_Gitlab_pattern = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)/-/"
 EBRAINS_Gitlab_pattern2 = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)"
