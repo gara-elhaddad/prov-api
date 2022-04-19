@@ -34,7 +34,7 @@ import fairgraph.openminds.computation as omcmp
 from ..auth.utils import get_kg_client_for_user_account
 from .data_models import Simulation, SimulationPatch, Simulator
 from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
-from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation, NotFoundError
 from .. import settings
 
 
@@ -128,7 +128,12 @@ def get_simulation(simulation_id: UUID, token: HTTPAuthorizationCredentials = De
     or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    simulation_object = omcmp.Visualization.from_uuid(str(simulation_id), kg_client, scope="in progress")
+    try:
+        simulation_object = omcmp.Visualization.from_uuid(str(simulation_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("simulation", simulation_id)
+    if simulation_object is None:
+        raise NotFoundError("simulation", simulation_id)    
     return Simulation.from_kg_object(simulation_object, kg_client)
 
 

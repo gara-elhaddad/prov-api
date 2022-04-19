@@ -38,7 +38,7 @@ from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import Visualisation, VisualisationPatch
 from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
-from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation, NotFoundError
 from .. import settings
 
 
@@ -157,7 +157,12 @@ def get_visualisation(visualisation_id: UUID, token: HTTPAuthorizationCredential
     or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    visualisation_object = omcmp.Visualization.from_uuid(str(visualisation_id), kg_client, scope="in progress")
+    try:
+        visualisation_object = omcmp.Visualization.from_uuid(str(visualisation_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("visualisation", visualisation_id)
+    if visualisation_object is None:
+        raise NotFoundError("visualisation", visualisation_id)
     return Visualisation.from_kg_object(visualisation_object, kg_client)
 
 

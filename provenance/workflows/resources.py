@@ -30,7 +30,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
-from ..common.utils import create_computation, delete_computation
+from ..common.utils import create_computation, delete_computation, NotFoundError
 from .data_models import WorkflowExecution
 from .. import settings
 
@@ -88,7 +88,12 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
     You may only retrieve public records, records that you created, or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="in progress")
+    try:
+        workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("record of a workflow execution", workflow_id)
+    if workflow_object is None:
+        raise NotFoundError("record of a workflow execution", workflow_id)
     return WorkflowExecution.from_kg_object(workflow_object, kg_client)
 
 

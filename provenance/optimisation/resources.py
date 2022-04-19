@@ -34,7 +34,7 @@ from fairgraph.base_v3 import as_list
 
 from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
 from .data_models import Optimisation, OptimisationPatch
-from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation, NotFoundError
 from ..auth.utils import get_kg_client_for_user_account
 
 
@@ -129,7 +129,12 @@ def get_optimisation(optimisation_id: UUID, token: HTTPAuthorizationCredentials 
     or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    optimisation_object = omcmp.Optimization.from_uuid(str(optimisation_id), kg_client, scope="in progress")
+    try:
+        optimisation_object = omcmp.Optimization.from_uuid(str(optimisation_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("optimisation", optimisation_id)
+    if optimisation_object is None:
+        raise NotFoundError("optimisation", optimisation_id)
     return Optimisation.from_kg_object(optimisation_object, kg_client)
 
 

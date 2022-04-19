@@ -31,7 +31,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
-from ..common.utils import patch_computation, delete_computation
+from ..common.utils import patch_computation, delete_computation, NotFoundError
 from .data_models import WorkflowRecipe, WorkflowRecipePatch
 
 
@@ -70,7 +70,12 @@ def get_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = D
     You may only retrieve public recipes, recipes that you created, or recipes associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="in progress")
+    try:
+        recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("workflow recipe", recipe_id)
+    if recipe_object is None:
+        raise NotFoundError("workflow recipe", recipe_id)
     return WorkflowRecipe.from_kg_object(recipe_object, kg_client)
 
 

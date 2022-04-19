@@ -34,7 +34,7 @@ from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import DataAnalysis, DataAnalysisPatch
 from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
-from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation
+from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation, NotFoundError
 
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -153,7 +153,12 @@ def get_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = D
     or records associated with a collab which you can view.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="in progress")
+    try:
+        data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="in progress")
+    except TypeError as err:
+        raise NotFoundError("data analysis", analysis_id)
+    if data_analysis_object is None:
+        raise NotFoundError("data analysis", analysis_id)
     return DataAnalysis.from_kg_object(data_analysis_object, kg_client)
 
 

@@ -77,3 +77,10 @@ def delete_computation(fairgraph_cls, computation_id, token):
 
 def invert_dict(D):
     return {value: key for key, value in D.items()}
+
+
+def NotFoundError(computation_type, identifier):
+    return HTTPException(
+        status_code=404,
+        detail=f"We could not find a record of a {computation_type} with identifier {identifier}"
+    )
