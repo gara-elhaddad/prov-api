@@ -69,7 +69,8 @@ class WorkflowExecution(BaseModel):
         }
         def get_class(obj):
             if isinstance(obj, KGProxy):
-                return obj.cls
+                robj = obj.resolve(client, scope="in progress")
+                return robj.__class__
             else:
                 return obj.__class__
         stages = [
