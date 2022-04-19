@@ -20,7 +20,6 @@ docstring goes here
 
 from typing import List
 from uuid import UUID, uuid4
-from datetime import datetime
 import logging
 
 from fairgraph.base_v3 import as_list
@@ -28,7 +27,6 @@ import fairgraph.openminds.computation as omcmp
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
 from ..common.utils import patch_computation, delete_computation, NotFoundError
@@ -89,7 +87,8 @@ def create_workflow_recipe(
     Store a new recipe, or a new version of an existing recipe, in the Knowledge Graph.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    if recipe.id is not None:
+    requested_recipe_uuid = None
+    if recipe.id is not None:        
         kg_recipe_version = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe.id), kg_client, scope="in progress")
         if kg_recipe_version is not None:
             raise HTTPException(
@@ -97,10 +96,25 @@ def create_workflow_recipe(
                 detail=f"A workflow recipe version with id {recipe.id} already exists. "
                         "The POST endpoint cannot be used to modify an existing version of a workflow recipe.",
             )
-    recipe.id = uuid4()
+        # we remove the requested id for now, so we can check no recipe with the same name and version already exists
+        requested_recipe_uuid = str(recipe.id)
+        recipe.id = None
     kg_recipe_version = recipe.to_kg_object(kg_client)
+
+    if kg_recipe_version.exists(kg_client, space=space):
+        raise HTTPException(
+            status_code=status_codes.HTTP_400_BAD_REQUEST,
+            detail=f"A workflow recipe version with name '{kg_recipe_version.name}' "
+                   f"and version {kg_recipe_version.version_identifier} already exists. "
+                    "The POST endpoint cannot be used to modify an existing version of a workflow recipe.",
+        )
+
+    # now we replace the requested recipe id, if any
+    if requested_recipe_uuid:
+        kg_recipe_version.id = kg_client.uri_from_uuid(requested_recipe_uuid)
+
     # try to figure out if this is a new version of an existing recipe
-    # todo in future: also search released workflow recipes
+    # todo in future: also search released workflow recipe
     alternative_versions = None
     parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
                                                 name=recipe.name)

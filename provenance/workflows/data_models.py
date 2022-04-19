@@ -99,7 +99,7 @@ class WorkflowExecution(BaseModel):
             recipe = None
         # todo: error message if recipe is not found
         obj = self.__class__.kg_cls(
-            id=client.uri_from_uuid(self.id),
+            id=client.uri_from_uuid(str(self.id)),
             started_by=started_by,
             recipe=recipe,
             stages=stages

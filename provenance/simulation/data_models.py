@@ -120,7 +120,7 @@ class Simulation(Computation):
         else:
             resource_usage = None
         obj = self.__class__.kg_cls(
-            id=client.uri_from_uuid(self.id),
+            id=client.uri_from_uuid(str(self.id)),
             lookup_label=f"Simulation run by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
             inputs=inputs,
             outputs=outputs,

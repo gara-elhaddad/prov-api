@@ -33,7 +33,7 @@ content_type_lookup = {
 
 class WorkflowRecipe(BaseModel):
     id: UUID = None
-    name: str
+    name: str = None
     alias: str = None
     custodians: List[Person] = None
     description: str = None

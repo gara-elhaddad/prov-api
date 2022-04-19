@@ -26,7 +26,7 @@ def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
 
 def replace_computation(pydantic_cls, fairgraph_cls, computation_id, pydantic_obj, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(computation_id, kg_client, scope="in progress")
+    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="in progress")
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -65,8 +65,8 @@ def patch_computation(pydantic_cls, fairgraph_cls, computation_id, patch, token)
 
 def delete_computation(fairgraph_cls, computation_id, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(computation_id, kg_client, scope="in progress")
-    if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space)):
+    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="in progress")
+    if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
             detail="You can only delete provenance records in your private space "

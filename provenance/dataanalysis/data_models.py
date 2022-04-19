@@ -84,7 +84,7 @@ class DataAnalysis(Computation):
         if self.id is None:
             self.id = uuid4()
         obj = self.__class__.kg_cls(
-            id=client.uri_from_uuid(self.id),
+            id=client.uri_from_uuid(str(self.id)),
             lookup_label=f"Data analysis by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
             inputs=inputs,
             outputs=outputs,
