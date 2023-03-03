@@ -1,6 +1,8 @@
 
 import sys
+import os
 from uuid import uuid4
+import json
 from datetime import datetime, timezone
 import pytest
 from pydantic import parse_obj_as
@@ -10,7 +12,7 @@ from fairgraph.client_v3 import KGv3Client as KGClient
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
-from fairgraph.base_v3 import IRI
+from fairgraph.base_v3 import IRI, as_list
 
 sys.path.append(".")  # run tests in root directory of project
 from provenance.main import app
@@ -22,6 +24,7 @@ TEST_SPACE = "collab-provenance-api-development"
 
 
 kg_client = KGClient(host="core.kg-ppd.ebrains.eu")  # don't use production for testing
+assert os.environ["KG_CORE_API_HOST"] == kg_client.host
 if kg_client.user_info():
     have_kg_connection = True
 else:
@@ -32,11 +35,6 @@ test_client = TestClient(app)
 
 
 no_kg_err_msg = "No KG connection - have you set the environment variable KG_AUTH_TOKEN?"
-
-
-omcore.SoftwareVersion.set_strict_mode(False)
-omcore.ModelVersion.set_strict_mode(False)
-omcore.ParameterSet.set_strict_mode(False, "context")
 
 
 @pytest.fixture(scope="module")
@@ -113,7 +111,6 @@ def output_file_objs(units):
 
 @pytest.fixture(scope="module")
 def software_version_objs():
-    omcore.SoftwareVersion.set_strict_mode(False)
     objs = [
         omcore.SoftwareVersion(id=f"{ID_PREFIX}/{uuid4()}", name="Elephant", alias="Elephant", version_identifier="0.10.0"),
         omcore.SoftwareVersion(id=f"{ID_PREFIX}/{uuid4()}", name="numpy", alias="numpy", version_identifier="1.19.3"),
@@ -127,7 +124,6 @@ def software_version_objs():
     yield objs
     for obj in objs:
         obj.delete(kg_client)
-    omcore.SoftwareVersion.set_strict_mode(True)
 
 
 @pytest.fixture(scope="module")
@@ -146,6 +142,7 @@ def model_version_obj():
 @pytest.fixture(scope="module")
 def hardware_obj():
     obj = omcmp.HardwareSystem.by_name("CSCS Castor", kg_client, scope="in progress", space="common")
+    assert obj is not None
     return obj
 
 
@@ -155,12 +152,13 @@ def environment_obj(software_version_objs, hardware_obj):
         id=f"{ID_PREFIX}/{uuid4()}",
         name="Some environment that doesn't really exist",
         hardware=hardware_obj,
-        configuration=omcore.ParameterSet(
-                parameters=[
-                    omcore.StringParameter(name="parameter1", value="value1"),
-                    omcore.StringParameter(name="parameter2", value="value2")
-                ],
-                context="hardware configuration for fake hardware"
+        configuration=omcore.Configuration(
+            configuration=json.dumps({
+                "parameter1": "value1",
+                "parameter2": "value2"
+            }, indent=2),
+            lookup_label="hardware configuration for fake hardware",
+            definition_format=omcore.ContentType(name="application/json")
         ),
         software=software_version_objs[1:4],
         description="Default environment on fake hardware"
@@ -178,8 +176,9 @@ def launch_config_obj():
         executable="/usr/bin/python",
         name="dummy launch config",
         arguments=["-Werror"],
-        environment_variables=omcore.ParameterSet(
-            parameters=[omcore.StringParameter(name="COLLAB_ID", value=TEST_SPACE)]
+        environment_variables=omcore.PropertyValueList(
+            lookup_label="Dummy environment variables for testing",
+            property_value_pairs=[omcore.StringProperty(name="COLLAB_ID", value=TEST_SPACE)]
         )
     )
     obj.save(kg_client, space=TEST_SPACE)
@@ -259,19 +258,18 @@ class TestFixtures:
 class TestGetDataAnalysis:
 
     def test_get_data_analysis(self, data_analysis_obj, environment_obj, software_version_objs):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.get(f"/analyses/{data_analysis_obj.uuid}",
                                 headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
+
         expected = {
             "description": None,
             "end_time": "2021-05-28T18:32:58.597000+00:00",
-            "environment": {"configuration": [{"description": "hardware configuration for "
-                                            "fake hardware",
-                                            "items": [{"name": "parameter1",
-                                                        "value": "value1"},
-                                                        {"name": "parameter2",
-                                                        "value": "value2"}]}],
+            "environment": {"configuration": {
+                                "parameter1": "value1",
+                                "parameter2": "value2"
+                            },
                             "description": "Default environment on fake hardware",
                             "hardware": "CSCS Castor",
                             "id": environment_obj.uuid,
@@ -293,7 +291,7 @@ class TestGetDataAnalysis:
                     "software_version": "0.10.0"}],
             "launch_config": {"arguments": ["-Werror"],
                             "description": None,
-                            "environment_variables": {"description": None,
+                            "environment_variables": {"description": "Dummy environment variables for testing",
                                                         "items": [{"name": "COLLAB_ID",
                                                                 "value": TEST_SPACE}]},
                             "executable": "/usr/bin/python",
@@ -319,7 +317,7 @@ class TestGetDataAnalysis:
 
 
     def test_query_data_analysis_by_inputs(self, data_analysis_obj, input_file_obj):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response_query = test_client.get(f"/analyses/?input_data={input_file_obj.uuid}&space={TEST_SPACE}",
                                         headers={"Authorization": f"Bearer {token}"})
         assert response_query.status_code == 200
@@ -333,7 +331,7 @@ class TestGetDataAnalysis:
 
 
     def test_query_data_analysis_by_software(self, data_analysis_obj, software_version_objs):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         # software that was explicitly an input
         response_query1 = test_client.get(f"/analyses/?software={software_version_objs[0].uuid}&space={TEST_SPACE}",
                                           headers={"Authorization": f"Bearer {token}"})
@@ -356,16 +354,16 @@ class TestGetDataAnalysis:
         assert response_query3.json() == []
 
     def test_query_data_analysis_by_platform(self, data_analysis_obj):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.get(f"/analyses/?platform=CSCS%20Castor&space={TEST_SPACE}",
                                 headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 200                         
+        assert response.status_code == 200
         data = response.json()
         assert len(data) > 0
         assert all(item["environment"]["hardware"] == "CSCS Castor" for item in data)
 
     def test_query_data_analysis_by_status(self, data_analysis_obj, input_file_obj):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.get(f"/analyses/?status=queued&space={TEST_SPACE}",
                                 headers={"Authorization": f"Bearer {token}"})
         data = response.json()
@@ -390,7 +388,7 @@ class TestGetDataAnalysis:
 class TestModifyDataAnaysis:
 
     def test_patch_data_analysis(self, data_analysis_obj):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.patch(f"/analyses/{data_analysis_obj.uuid}",
                                     json={"status": "completed"},
                                     headers={"Authorization": f"Bearer {token}"})
@@ -408,19 +406,17 @@ class TestModifyDataAnaysis:
 class TestGetVisualisation:
 
     def test_get_visualisation(self, visualisation_obj, environment_obj, software_version_objs):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.get(f"/visualisations/{visualisation_obj.uuid}",
                                 headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 200
         expected = {
             "description": None,
             "end_time": "2021-06-28T16:33:27+00:00",
-            "environment": {"configuration": [{"description": "hardware configuration for "
-                                            "fake hardware",
-                                            "items": [{"name": "parameter1",
-                                                        "value": "value1"},
-                                                        {"name": "parameter2",
-                                                        "value": "value2"}]}],
+            "environment": {"configuration": {
+                                "parameter1": "value1",
+                                "parameter2": "value2"
+                            },
                             "description": "Default environment on fake hardware",
                             "hardware": "CSCS Castor",
                             "id": environment_obj.uuid,
@@ -442,7 +438,7 @@ class TestGetVisualisation:
                     "software_version": "0.10.0"}],
             "launch_config": {"arguments": ["-Werror"],
                             "description": None,
-                            "environment_variables": {"description": None,
+                            "environment_variables": {"description": "Dummy environment variables for testing",
                                                         "items": [{"name": "COLLAB_ID",
                                                                 "value": TEST_SPACE}]},
                             "executable": "/usr/bin/python",
@@ -471,7 +467,7 @@ class TestGetVisualisation:
 class TestModifyVisualisation:
 
     def test_patch_visualisation(self, visualisation_obj):
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.patch(f"/visualisations/{visualisation_obj.uuid}",
                                     json={"status": "failed"},
                                     headers={"Authorization": f"Bearer {token}"})
@@ -491,11 +487,7 @@ class TestCreateSimulation:
                              model_version_obj, environment_obj, launch_config_obj):
         data = {
             "environment": {
-                "configuration": [{
-                    "description": environment_obj.configuration.context,
-                    "items": [{"name": item.name, "value": item.value}
-                            for item in environment_obj.configuration.parameters],
-                }],
+                "configuration": json.loads(environment_obj.configuration.configuration),
                 "description": environment_obj.description,
                 "hardware": environment_obj.hardware.name,
                 "id": environment_obj.uuid,
@@ -519,7 +511,7 @@ class TestCreateSimulation:
                 "arguments": launch_config_obj.arguments,
                 "environment_variables": {
                     "items": [{"name": envvar.name, "value": envvar.value}
-                            for envvar in launch_config_obj.environment_variables.parameters]
+                            for envvar in launch_config_obj.environment_variables.property_value_pairs]
                 },
                 "executable": launch_config_obj.executable,
                 "name": launch_config_obj.name
@@ -546,7 +538,7 @@ class TestCreateSimulation:
             "tags": ["ham", "eggs"],
             "type": "simulation"
         }
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.post("/simulations/",
                                     json=data,
                                     headers={"Authorization": f"Bearer {token}"})
@@ -558,7 +550,11 @@ class TestCreateSimulation:
 class TestCreateWorkflowRecipe:
 
     def test_post_recipe(self, person_obj):
-        data = { 
+        existing_recipe = omcmp.WorkflowRecipeVersion.list(kg_client, alias="PSD_workflow_KG", version_identifier="12345678", scope="in progress")
+        if existing_recipe:
+            for recipe in as_list(existing_recipe):
+                recipe.delete(kg_client)
+        data = {
             "name": "PSD (Power Spectral Density) Calculation Workflow with input file from Knowledge Graph",
             "alias": "PSD_workflow_KG",
             "custodians": [{"given_name": person_obj.given_name, "family_name": person_obj.family_name}],
@@ -566,10 +562,11 @@ class TestCreateWorkflowRecipe:
             "developers": [{"given_name": person_obj.given_name, "family_name": person_obj.family_name}],
             "homepage": "https://gitlab.ebrains.eu/technical-coordination/project-internal/workflows/cwl-workflows/-/tree/main/PSD_workflow_KG",
             "location": "https://gitlab.ebrains.eu/technical-coordination/project-internal/workflows/cwl-workflows",
-            "version_identifier": "1b13278f"
+            "version_identifier": "12345678"
         }
-        token = kg_client._kg_client.token_handler.get_token()
+        token = kg_client.token
         response = test_client.post("/recipes/?space=collab-provenance-api-development",
                                     json=data,
                                     headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 201
+        # todo: delete the new recipe again

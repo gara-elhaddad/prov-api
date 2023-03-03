@@ -44,11 +44,9 @@ EXAMPLES = {
             "environment": {
                 "name": "docker-registry.ebrains.eu/tc/cwl-workflows/psd_workflow_analysis@sha256:6a9014185aa4a47729f301c78050fc562491e3b95ef91482fdb907bf9aec84c3",
                 "hardware": "generic",
-                "configuration": [{
-                    "items": [
-                        {"name": "platform", "value": "macOS-12.2.1-arm64-arm-64bit"}
-                    ]
-                }],
+                "configuration": {
+                    "platform": "macOS-12.2.1-arm64-arm-64bit"
+                },
                 "software": [{
                     "software_name": "Docker",
                     "software_version": "20.10.12"
@@ -83,11 +81,7 @@ EXAMPLES = {
             "description": "Run of workflow/packed.cwl#main/visualization",
             "end_time": "2022-03-28T16:07:07.786379",
             "environment": {
-                "configuration": [{
-                    "items": [
-                        {"name": "platform", "value": "macOS-12.2.1-arm64-arm-64bit"}
-                    ]
-                }],
+                "configuration": {"platform": "macOS-12.2.1-arm64-arm-64bit"},
                 "description": "Docker container run from docker-registry.ebrains.eu/tc/cwl-workflows/psd_workflow_visualization:latest on Andrew Davison's MacBook Pro (14-inch, 2021)",
                 "hardware": "generic",
                 "name": "docker-registry.ebrains.eu/tc/cwl-workflows/psd_workflow_visualization@sha256:b4c6a687da51e3117f97dcf5de1611e5e09eebb7865e8d9194151fe81e823b54",
@@ -103,7 +97,7 @@ EXAMPLES = {
                 },
                 "location": None,
                 "size": 3515921
-            }, 
+            },
             {
                 "description":
                 "Computes the PSD (Power Spectral Density) for every selected channel in the signal",

@@ -21,7 +21,7 @@ docstring goes here
 from enum import Enum
 from os import environ
 from uuid import UUID
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Any
 import re
 import hashlib
 import json
@@ -34,7 +34,7 @@ except ImportError:
     from typing_extensions import Literal
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, AnyUrl, Field
+from pydantic import BaseModel, AnyUrl, Field, Json
 
 from fairgraph.base_v3 import KGProxy as KGProxy, IRI, as_list
 #from fairgraph.openminds import controlledterms
@@ -47,16 +47,20 @@ from .examples import EXAMPLES
 from ..auth.utils import get_kg_client_for_service_account
 
 
+
 status_name_map = {
     "active": "running",
     "completed": "completed",
     "failed": "failed",
-    "potential": "queued"
+    "potential": "queued",
+    "inactive": None,
+    "pending": None,
+    "paused": None
 }
 
 def _get_action_status_types():
     kg_client_service_account = get_kg_client_for_service_account()
-    return ActionStatusType.list(kg_client_service_account, scope="in progress", 
+    return ActionStatusType.list(kg_client_service_account, scope="in progress",
                                  api="core", space="controlled", size=10)
 
 
@@ -64,11 +68,12 @@ ACTION_STATUS_TYPES = _get_action_status_types()
 
 Status = Enum(
     "Status",
-    [(status_name_map[ast.name], status_name_map[ast.name]) 
-     for ast in ACTION_STATUS_TYPES]
+    [(status_name_map[ast.name], status_name_map[ast.name])
+     for ast in ACTION_STATUS_TYPES
+     if status_name_map[ast.name]]
 )
 
-ACTION_STATUS_TYPES = {status_name_map[ast.name]: ast for ast in ACTION_STATUS_TYPES}
+ACTION_STATUS_TYPES = {status_name_map[ast.name]: ast for ast in ACTION_STATUS_TYPES if status_name_map[ast.name]}
 
 
 class CryptographicHashFunction(str, Enum):
@@ -105,14 +110,18 @@ UNITS = {u: unit_obj for u, unit_obj in zip(Units, UNITS)}
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
     content_types = omcore.ContentType.list(kg_client_service_account, api="core", scope="in progress", space="controlled", size=10000)
-    values = [(get_identifier(ct.id, "ct"), ct.name) for ct in content_types]
-    return values
+    return content_types
+
+
+CONTENT_TYPES = _get_content_types()
 
 
 ContentType = Enum(
     "ContentType",
-    _get_content_types()
+    [(get_identifier(ct.id, "ct"), ct.name) for ct in CONTENT_TYPES]
 )
+
+CONTENT_TYPES = {ct: ct_obj for ct, ct_obj in zip(ContentType, CONTENT_TYPES)}
 
 
 class ComputationType(str, Enum):
@@ -378,7 +387,7 @@ class StringParameter(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return omcore.StringParameter(name=self.name, value=self.value)
+        return omcore.StringProperty(name=self.name, value=self.value)
 
 
 class NumericalParameter(BaseModel):
@@ -409,7 +418,7 @@ class NumericalParameter(BaseModel):
         )
 
     def to_kg_object(self, client):
-        return omcore.NumericalParameter(
+        return omcore.NumericalProperty(
             name=self.name,
             values=QuantitativeValue(value=self.value, units=UNITS[self.units])
         )
@@ -431,22 +440,22 @@ class ParameterSet(BaseModel):
     @classmethod
     def from_kg_object(cls, ps_object, client):
         items = []
-        for param in as_list(ps_object.parameters):
-            if isinstance(param, omcore.NumericalParameter):
+        for param in as_list(ps_object.property_value_pairs):
+            if isinstance(param, omcore.NumericalProperty):
                 items.append(NumericalParameter.from_kg_object(param))
-            elif isinstance(param, omcore.StringParameter):
+            elif isinstance(param, omcore.StringProperty):
                 items.append(StringParameter.from_kg_object(param))
             else:
                 raise TypeError("unexpected object type in parameter set")
         return cls(
             items=items,
-            description=ps_object.context
+            description=ps_object.lookup_label
         )
 
     def to_kg_object(self, client):
-        return omcore.ParameterSet(
-            parameters=[item.to_kg_object(client) for item in self.items],
-            context=self.description
+        return omcore.PropertyValueList(
+            property_value_pairs=[item.to_kg_object(client) for item in self.items],
+            lookup_label=self.description
         )
 
 
@@ -531,9 +540,7 @@ class SoftwareVersion(BaseModel):
 
     @classmethod
     def from_kg_object(cls, software_version_object, client):
-        omcore.SoftwareVersion.set_strict_mode(False)
         svo = software_version_object.resolve(client, scope="in progress")
-        omcore.SoftwareVersion.set_strict_mode(True)
         return cls(
             id=client.uuid_from_uri(svo.id),
             software_name=svo.name,
@@ -541,10 +548,8 @@ class SoftwareVersion(BaseModel):
         )
 
     def to_kg_object(self, client):
-        omcore.SoftwareVersion.set_strict_mode(False)
         obj = omcore.SoftwareVersion(name=self.software_name, alias=self.software_name,
-                                version_identifier=self.software_version)
-        omcore.SoftwareVersion.set_strict_mode(True)
+                                     version_identifier=self.software_version)
         return obj
 
 
@@ -554,9 +559,7 @@ class ComputationalEnvironment(BaseModel):
     id: UUID = None
     name: str = Field(..., description="A name/label for this computing environment")
     hardware: HardwareSystem = Field(..., description="The hardware system on which this environment runs")
-    configuration: Optional[List[
-        ParameterSet
-    ]] = Field(None, description="All important hardware settings defining this environment")
+    configuration: Optional[dict] = Field(None, description="All important hardware settings defining this environment")
     software: Optional[List[
         SoftwareVersion
     ]] = Field(None, description="All software versions available in this environment. Note that the Analysis/Simulation schemas allow storing a list of software versions actually _used_ in a computation")
@@ -572,11 +575,15 @@ class ComputationalEnvironment(BaseModel):
             hardware = HardwareSystem(env.hardware.resolve(client, scope="in progress").name)
         else:
             hardware = None
+        if env.configuration:
+            config = env.configuration.resolve(client, scope="in progress").configuration
+        else:
+            config = None
         return cls(
             id=client.uuid_from_uri(env.id),
             name=env.name,
             hardware=hardware,
-            configuration=[ParameterSet.from_kg_object(obj, client) for obj in as_list(env.configuration)],
+            configuration=json.loads(config),
             software=[SoftwareVersion.from_kg_object(obj, client) for obj in as_list(env.software)],
             description=env.description
         )
@@ -585,7 +592,10 @@ class ComputationalEnvironment(BaseModel):
         return omcmp.Environment(
             name=self.name,
             hardware=HARDWARE_SYSTEMS[self.hardware.value],
-            configuration=[conf.to_kg_object(client) for conf in as_list(self.configuration)],
+            configuration=omcore.Configuration(
+                configuration=json.dumps(self.configuration, indent=2),
+                definition_format=omcore.ContentType(name="application/json")
+            ),
             software=[sv.to_kg_object(client) for sv in as_list(self.software)],
             description=self.description
         )

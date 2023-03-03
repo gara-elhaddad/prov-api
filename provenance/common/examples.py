@@ -15,19 +15,10 @@ EXAMPLES = {
     "ComputationalEnvironment": {
         "name": "SpiNNaker default 2021-10-13",
         "hardware": "SpiNNaker",
-        "configuration": [
-            {
-                "items": [{
-                    "name": "parameter1",
-                    "value": "value1"
-                },
-                    {
-                    "name": "parameter2",
-                    "value": "value2"
-                }],
-                "description": "hardware configuration for SpiNNaker 1M core machine"
-            }
-        ],
+        "configuration": {
+            "parameter1": "value1",
+            "parameter2": "value2"
+        },
         "software": [
             {
                 "software_name": "numpy",

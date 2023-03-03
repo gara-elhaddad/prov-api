@@ -88,7 +88,7 @@ def create_workflow_recipe(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     requested_recipe_uuid = None
-    if recipe.id is not None:        
+    if recipe.id is not None:
         kg_recipe_version = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe.id), kg_client, scope="in progress")
         if kg_recipe_version is not None:
             raise HTTPException(
@@ -101,7 +101,7 @@ def create_workflow_recipe(
         recipe.id = None
     kg_recipe_version = recipe.to_kg_object(kg_client)
 
-    if kg_recipe_version.exists(kg_client, space=space):
+    if kg_recipe_version.exists(kg_client):
         raise HTTPException(
             status_code=status_codes.HTTP_400_BAD_REQUEST,
             detail=f"A workflow recipe version with name '{kg_recipe_version.name}' "
@@ -141,13 +141,13 @@ def create_workflow_recipe(
         parent_workflow.versions = as_list(parent_workflow.versions) + [kg_recipe_version]
     else:
         parent_workflow = omcmp.WorkflowRecipe(
-            name=kg_recipe_version.name, 
-            alias=kg_recipe_version.alias, 
+            name=kg_recipe_version.name,
+            alias=kg_recipe_version.alias,
             description=kg_recipe_version.description,
             developers=kg_recipe_version.developers,
             versions=[kg_recipe_version])
     kg_recipe_version.save(kg_client, space=space, recursive=True)
-    parent_workflow.save(kg_client, space=space, recursive=False)
+    parent_workflow.save(kg_client, space=parent_workflow.space or space, recursive=False)
     return WorkflowRecipe.from_kg_object(kg_recipe_version, kg_client)
 
 

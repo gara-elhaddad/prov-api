@@ -115,8 +115,6 @@ class TestDataAnalysis:
         kg_objects = pydantic_obj.to_kg_object(kg_client)
 
     def test_conversion_from_kg_objects(self):
-        omcore.SoftwareVersion.set_strict_mode(False)
-        omcore.ParameterSet.set_strict_mode(False, "context")
 
         started_by = omcore.Person(
             family_name="Destexhe",
@@ -144,12 +142,16 @@ class TestDataAnalysis:
             id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000",
             name="SpiNNaker default 2021-10-13",
             hardware=omcmp.HardwareSystem(name="SpiNNaker"),
-            configuration=omcore.ParameterSet(
-                    parameters=[
-                        omcore.StringParameter(name="parameter1", value="value1"),
-                        omcore.StringParameter(name="parameter2", value="value2")
-                    ],
-                    context="hardware configuration for SpiNNaker 1M core machine"
+            configuration=omcore.Configuration(
+                    configuration=json.dumps(
+                        {
+                            "parameter1": "value1",
+                            "parameter2": "value2"
+                        },
+                        indent=2
+                    ),
+                    definition_format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
+                    lookup_label="hardware configuration for SpiNNaker 1M core machine"
             ),
             software=[
                 omcore.SoftwareVersion(name="numpy", version_identifier="1.19.3", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
@@ -162,8 +164,8 @@ class TestDataAnalysis:
         launch_configuration = omcmp.LaunchConfiguration(
             executable="/usr/bin/python",
             arguments=["-Werror"],
-            environment_variables=omcore.ParameterSet(
-                parameters=[omcore.StringParameter(name= "COLLAB_ID", value= "myspace")]
+            environment_variables=omcore.PropertyValueList(
+                property_value_pairs=[omcore.StringProperty(name= "COLLAB_ID", value= "myspace")]
             )
         )
         resource_usage = [omcore.QuantitativeValue(value=1017.3, unit=omterms.UnitOfMeasurement(name="core-hour"))]
@@ -190,11 +192,13 @@ class TestDataAnalysis:
             item.id = None
         pydantic_obj.input[1].id = None
 
-        actual = pydantic_obj.json(exclude_none=True)
-        expected = json.dumps(deepcopy(EXAMPLES["DataAnalysis"]))
+        actual = json.loads(pydantic_obj.json(exclude_none=True))
+        #expected = json.dumps(deepcopy(EXAMPLES["DataAnalysis"]))
+        expected = EXAMPLES["DataAnalysis"]
 
-        diff = jsondiff.diff(actual, expected, load=True, syntax="explicit")
-        assert len(diff) == 0
+        #diff = jsondiff.diff(actual, expected, load=True, syntax="explicit")
+        #assert len(diff) == 0
+        assert actual == expected
 
 
 class TestVisualisation:

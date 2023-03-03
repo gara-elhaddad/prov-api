@@ -34,7 +34,10 @@ from ..auth.utils import get_kg_client_for_user_account
 
 from .data_models import DataAnalysis, DataAnalysisPatch
 from ..common.data_models import HardwareSystem, Status, ACTION_STATUS_TYPES
-from ..common.utils import create_computation, replace_computation, patch_computation, delete_computation, NotFoundError
+from ..common.utils import (
+    create_computation, replace_computation, patch_computation,
+    delete_computation, NotFoundError, expand_combinations
+)
 
 
 logger = logging.getLogger("ebrains-prov-api")
@@ -126,9 +129,26 @@ def query_analyses(
         if key in filters and len(filters[key]) == 0:
             del filters[key]
 
-    data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
-                                                    size=size, from_index=from_index,
-                                                    space=space, **filters)
+    filters = expand_combinations(filters)
+
+    if len(filters) == 1:
+        # common, simple case
+        data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
+                                                        size=size, from_index=from_index,
+                                                        space=space, **filters[0])
+    else:
+        # more complex case for pagination
+        # inefficient if from_index is not 0
+        data_analysis_objects = {}
+        for filter in filters:
+            results = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
+                                                size=size, from_index=from_index,
+                                                space=space, **filter)
+            for result in results:
+                data_analysis_objects[result.uuid] = result  # use dict to remove duplicates
+
+        data_analysis_objects = data_analysis_objects.values()
+
     return [DataAnalysis.from_kg_object(obj, kg_client) for obj in data_analysis_objects]
 
 

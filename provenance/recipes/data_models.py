@@ -49,19 +49,19 @@ class WorkflowRecipe(BaseModel):
     @classmethod
     def from_kg_object(cls, recipe_version, client):
         recipe = omcmp.WorkflowRecipe.list(client, scope="in progress",
-                                           space=recipe_version.space,
+                                           #space=recipe_version.space,
                                            versions=recipe_version)[0]
         if recipe_version.custodians:
-            custodians = [Person.from_kg_object(p, client) 
+            custodians = [Person.from_kg_object(p, client)
                           for p in as_list(recipe_version.custodians)]  # todo: could be Organization
         else:
-            custodians = [Person.from_kg_object(p, client) 
+            custodians = [Person.from_kg_object(p, client)
                           for p in as_list(recipe.custodians)]
         if recipe_version.developers:
-            developers = [Person.from_kg_object(p, client) 
+            developers = [Person.from_kg_object(p, client)
                           for p in as_list(recipe_version.developers)]
         else:
-            developers = [Person.from_kg_object(p, client) 
+            developers = [Person.from_kg_object(p, client)
                           for p in as_list(recipe.developers)]
         if recipe_version.format:
             type_ = content_type_lookup.get(

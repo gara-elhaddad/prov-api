@@ -1,7 +1,9 @@
 from uuid import uuid4
+import itertools
 from fastapi import HTTPException, status
 
 import fairgraph.openminds.computation as omcmp
+from fairgraph.base_v3 import as_list
 
 from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
 
@@ -84,3 +86,11 @@ def NotFoundError(computation_type, identifier):
         status_code=404,
         detail=f"We could not find a record of a {computation_type} with identifier {identifier}"
     )
+
+
+def expand_combinations(D):
+    if D:
+        keys, values = zip(*D.items())
+        return [dict(zip(keys, v)) for v in itertools.product(*[as_list(v) for v in values])]
+    else:
+        return [D]
