@@ -103,7 +103,7 @@ class Simulation(Computation):
             started_by=Person.from_kg_object(dao.started_by, client),
             status=getattr(Status, status_name_map[dao.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(dao.resource_usages)],
-            tags=dao.tags
+            tags=as_list(dao.tags)
         )
 
     def to_kg_object(self, client):
