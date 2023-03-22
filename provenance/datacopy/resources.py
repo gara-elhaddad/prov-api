@@ -101,7 +101,7 @@ def query_data_copies(
     # data_copy_objects = omcmp.DataCopy.list(kg_client, scope="any", api="query",
     #                                                 size=size, from_index=from_index,
     #                                                 space=space)
-    # return [obj.from_kg_object(kg_client) for obj in data_copy_objects]
+    # return [DataCopy.from_kg_object(obj, kg_client) for obj in data_copy_objects]
 
 
 @router.post("/data_copies/", response_model=DataCopy, status_code=status_codes.HTTP_201_CREATED)

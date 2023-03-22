@@ -105,7 +105,7 @@ def query_optimisations(
     optimisation_objects = omcmp.Optimization.list(kg_client, scope="any", api="query",
                                                    size=size, from_index=from_index,
                                                    space=space)
-    return [obj.from_kg_object(kg_client) for obj in optimisation_objects]
+    return [Optimisation.from_kg_object(obj, kg_client) for obj in optimisation_objects]
 
 
 @router.post("/optimisations/", response_model=Optimisation, status_code=status_codes.HTTP_201_CREATED)

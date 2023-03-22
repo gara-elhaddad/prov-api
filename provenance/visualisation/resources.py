@@ -133,7 +133,7 @@ def query_visualisations(
     visualisation_objects = omcmp.Visualization.list(kg_client, scope="any", api="query",
                                                     size=size, from_index=from_index,
                                                     space=space)
-    return [obj.from_kg_object(kg_client) for obj in visualisation_objects]
+    return [Visualisation.from_kg_object(obj, kg_client) for obj in visualisation_objects]
 
 
 @router.post("/visualisations/", response_model=Visualisation, status_code=status_codes.HTTP_201_CREATED)

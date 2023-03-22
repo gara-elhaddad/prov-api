@@ -104,7 +104,7 @@ def query_simulations(
     simulation_objects = omcmp.Simulation.list(kg_client, scope="any", api="query",
                                                size=size, from_index=from_index,
                                                space=space)
-    return [obj.from_kg_object(kg_client) for obj in simulation_objects]
+    return [Simulation.from_kg_object(obj, kg_client) for obj in simulation_objects]
 
 
 @router.post("/simulations/", response_model=Simulation, status_code=status_codes.HTTP_201_CREATED)
