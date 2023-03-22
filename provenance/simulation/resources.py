@@ -49,7 +49,7 @@ def query_simulations(
     model_version: UUID = Query(None, description="Return only simulations of this model version"),
     simulator: Simulator = Query(None, description="Return simulations using this simulator"),
     platform: HardwareSystem = Query(None, description="Return simulations that ran on this hardware platform"),
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     status: Status = Query(None, description="Return simulations with this status"),
     tags: List[str] = Query(None, description="Return simulations with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),
@@ -110,7 +110,7 @@ def query_simulations(
 @router.post("/simulations/", response_model=Simulation, status_code=status_codes.HTTP_201_CREATED)
 def create_simulation(
     simulation: Simulation,
-    space: str = Query("myspace", description="Knowledge Graph space to save to"),
+    space: str = Query(None, description="Knowledge Graph space to save to"),
     token: HTTPAuthorizationCredentials = Depends(auth)
 ):
     """

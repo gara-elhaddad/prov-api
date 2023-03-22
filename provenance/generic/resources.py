@@ -53,7 +53,7 @@ def query_miscellaneous(
     input_data: UUID = Query(None, description="Return computations using a given data file or directory containing data files"),
     software: UUID = Query(None, description="Return computations that used a specific software version"),
     platform: HardwareSystem = Query(None, description="Return computations that ran on this hardware platform"),
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     status: Status = Query(None, description="Return computations with this status"),
     tags: List[str] = Query(None, description="Return computations with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),

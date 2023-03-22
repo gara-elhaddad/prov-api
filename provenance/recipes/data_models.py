@@ -38,11 +38,11 @@ class WorkflowRecipe(BaseModel):
     custodians: List[Person] = None
     description: str = None
     developers: List[Person] = None
-    type: WorkflowRecipeType = None   # temporarily allow none, until new content types added
+    type: WorkflowRecipeType = None   # temporarily allow None
     full_documentation: AnyHttpUrl = None
     homepage: AnyHttpUrl = None
     keywords: List[str] = None
-    location: AnyUrl
+    location: AnyUrl = None  # temporarily allow None, but really this should always be present
     version_identifier: str
     version_innovation: str = None
 
@@ -75,6 +75,11 @@ class WorkflowRecipe(BaseModel):
             homepage = recipe.homepage.value
         else:
             homepage = None
+        location = None
+        if recipe_version.repository:
+            repo_obj = recipe_version.repository.resolve(client, scope="any")
+            if repo_obj:
+                location = str(repo_obj.iri)
         return cls(
             id=recipe_version.uuid,
             name=recipe_version.name or recipe.name,
@@ -85,8 +90,8 @@ class WorkflowRecipe(BaseModel):
             type=type_,
             full_documentation=recipe_version.full_documentation,
             homepage=homepage,
-            keywords=recipe_version.keywords,
-            location=str(recipe_version.repository.resolve(client, scope="any").iri),
+            #keywords=as_list(recipe_version.keywords),  # todo: resolve keyword objects
+            location=location,
             version_identifier=recipe_version.version_identifier,
             version_innovation=recipe_version.version_innovation
         )

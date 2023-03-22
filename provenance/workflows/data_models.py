@@ -83,9 +83,14 @@ class WorkflowExecution(BaseModel):
             cls_map[get_class(stage)].from_kg_object(stage, client)
             for stage in weo.stages
         ]
+        config = None
+        if weo.configuration:
+            config_obj = weo.configuration.resolve(client, scope="any")
+            if config_obj:
+                config = json.loads(config_obj.configuration)
         return cls(
             id=weo.uuid,
-            configuration=weo.configuration.to_json(),
+            configuration=config,
             stages=stages,
             recipe_id=weo.recipe.uuid if weo.recipe else None,
             started_by=Person.from_kg_object(weo.started_by, client) if weo.started_by else None

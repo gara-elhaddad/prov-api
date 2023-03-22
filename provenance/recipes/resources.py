@@ -41,7 +41,7 @@ router = APIRouter()
 
 @router.get("/recipes/", response_model=List[WorkflowRecipe])
 def query_workflow_recipes(
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     size: int = Query(100, description="Number of records to return"),
     from_index: int = Query(0, description="Index of the first record to return"),
     # from header

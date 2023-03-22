@@ -52,7 +52,7 @@ router = APIRouter()
 def query_data_copies(
     research_product: UUID = Query(None, description="Return records of data copies from this research product"),
     input_data: UUID = Query(None, description="Return records of copies of a given data file or directory containing data files"),
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     status: Status = Query(None, description="Return records of data copies with this status"),
     tags: List[str] = Query(None, description="Return records of data copies with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),
@@ -65,46 +65,46 @@ def query_data_copies(
     docstring goes here
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    # filters = {
-    #     "inputs": []
-    # }
-    # if research_product:
-    #     rp_obj = KGObject.from_id(research_product, kg_client)
-    #     if rp_obj is None:
-    #         raise HTTPException(
-    #             status_code=status_codes.HTTP_404_NOT_FOUND,
-    #             detail="No such research product"
-    #         )
-    #     files = omcore.File.list(kg_client, file_repository=rp_obj.repository)
-    #     if len(files) > 100:  # todo: figure out what a reasonable limit is
-    #         raise HTTPException(
-    #             status_code=status_codes.HTTP_400_BAD_REQUEST,
-    #             detail="This dataset has too many files for this query"
-    #         )
-    #     if len(files) > 0:
-    #         filters["inputs"].extend(as_list(files))
-    #     # todo: support FileBundle
-    # # filter by input_data
-    # if input_data:
-    #     filters["inputs"].extend(as_list(input_data))
-    # # filter by status
-    # if status:
-    #     filters["status"] = ACTION_STATUS_TYPES[status.value]
-    # # filter by tag
-    # if tags:
-    #     filters["tags"] = tags
+    filters = {
+        "inputs": []
+    }
+    if research_product:
+        rp_obj = KGObject.from_id(research_product, kg_client)
+        if rp_obj is None:
+            raise HTTPException(
+                status_code=status_codes.HTTP_404_NOT_FOUND,
+                detail="No such research product"
+            )
+        files = omcore.File.list(kg_client, file_repository=rp_obj.repository)
+        if len(files) > 100:  # todo: figure out what a reasonable limit is
+            raise HTTPException(
+                status_code=status_codes.HTTP_400_BAD_REQUEST,
+                detail="This dataset has too many files for this query"
+            )
+        if len(files) > 0:
+            filters["inputs"].extend(as_list(files))
+        # todo: support FileBundle
+    # filter by input_data
+    if input_data:
+        filters["inputs"].extend(as_list(input_data))
+    # filter by status
+    if status:
+        filters["status"] = ACTION_STATUS_TYPES[status.value]
+    # filter by tag
+    if tags:
+        filters["tags"] = tags
 
-    # for key in ("inputs", "environment"):
-    #     if key in filters and len(filters[key]) == 0:
-    #         del filters[key]
+    for key in ("inputs",):
+        if key in filters and len(filters[key]) == 0:
+            del filters[key]
 
-    # data_copy_objects = omcmp.DataCopy.list(kg_client, scope="any", api="query",
-    #                                                 size=size, from_index=from_index,
-    #                                                 space=space)
-    # return [DataCopy.from_kg_object(obj, kg_client) for obj in data_copy_objects]
+    data_copy_objects = omcmp.DataCopy.list(kg_client, scope="any", api="query",
+                                            size=size, from_index=from_index,
+                                            space=space)
+    return [DataCopy.from_kg_object(obj, kg_client) for obj in data_copy_objects]
 
 
-@router.post("/data_copies/", response_model=DataCopy, status_code=status_codes.HTTP_201_CREATED)
+@router.post("/datacopies/", response_model=DataCopy, status_code=status_codes.HTTP_201_CREATED)
 def create_data_copy(
     data_copy: DataCopy,
     space: str = "myspace",
@@ -116,7 +116,7 @@ def create_data_copy(
     return create_computation(DataCopy, omcmp.DataCopy, data_copy, space, token)
 
 
-@router.get("/data copies/{data_copy_id}", response_model=DataCopy)
+@router.get("/datacopies/{data_copy_id}", response_model=DataCopy)
 def get_data_copy(data_copy_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Retrieve a specific data_copy record, identified by its ID.
@@ -134,7 +134,7 @@ def get_data_copy(data_copy_id: UUID, token: HTTPAuthorizationCredentials = Depe
     return DataCopy.from_kg_object(data_copy_object, kg_client)
 
 
-@router.put("/data copies/{data_copy_id}", response_model=DataCopy)
+@router.put("/datacopies/{data_copy_id}", response_model=DataCopy)
 def replace_data_copy(
     data_copy_id: UUID,
     data_copy: DataCopy,
@@ -149,7 +149,7 @@ def replace_data_copy(
     return replace_computation(DataCopy, omcmp.DataCopy, data_copy_id, data_copy, token)
 
 
-@router.patch("/data copies/{data_copy_id}", response_model=DataCopy)
+@router.patch("/datacopies/{data_copy_id}", response_model=DataCopy)
 def update_data_copy(
     data_copy_id: UUID,
     patch: DataCopyPatch,
@@ -164,7 +164,7 @@ def update_data_copy(
     return patch_computation(DataCopy, omcmp.DataCopy, data_copy_id, patch, token)
 
 
-@router.delete("/data_copies/{data_copy_id}", response_model=DataCopy)
+@router.delete("/datacopies/{data_copy_id}", response_model=DataCopy)
 def delete_data_copy(data_copy_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Delete a data_copy record.

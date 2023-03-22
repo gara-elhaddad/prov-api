@@ -55,7 +55,7 @@ def query_visualisations(
     input_data: UUID = Query(None, description="Return visualisations of a given data file or directory containing data files"),
     software: UUID = Query(None, description="Return visualisations that used a specific software version"),
     platform: HardwareSystem = Query(None, description="Return visualisations that ran on this hardware platform"),
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     status: Status = Query(None, description="Return visualisations with this status"),
     tags: List[str] = Query(None, description="Return visualisations with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),

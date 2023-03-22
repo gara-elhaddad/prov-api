@@ -78,9 +78,11 @@ class Simulation(Computation):
 
     @classmethod
     def from_kg_object(cls, simulation_object, client):
-        dao = simulation_object.resolve(client, scope="any")
+        if isinstance(simulation_object, KGProxy):
+            simulation_object = simulation_object.resolve(client, scope="any")
+        assert isinstance(simulation_object, omcmp.Simulation)
         inputs = []
-        for obj in as_list(dao.inputs):
+        for obj in as_list(simulation_object.inputs):
             if isinstance(obj, KGProxy):
                 obj = obj.resolve(client, scope="any")
             if isinstance(obj, (omcore.File, omcmp.LocalFile)):
@@ -92,18 +94,19 @@ class Simulation(Computation):
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(obj)}")
         return cls(
-            id=client.uuid_from_uri(dao.id),
+            id=client.uuid_from_uri(simulation_object.id),
             type=cls.__fields__["type"].type_.__args__[0],
             input=inputs,
-            output=[File.from_kg_object(obj, client) for obj in as_list(dao.outputs)],
-            environment=ComputationalEnvironment.from_kg_object(dao.environment, client),
-            launch_config=LaunchConfiguration.from_kg_object(dao.launch_configuration, client),
-            start_time=dao.start_time,
-            end_time=dao.end_time,
-            started_by=Person.from_kg_object(dao.started_by, client),
-            status=getattr(Status, status_name_map[dao.status.resolve(client).name]),
-            resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(dao.resource_usages)],
-            tags=as_list(dao.tags)
+            output=[File.from_kg_object(obj, client) for obj in as_list(simulation_object.outputs)],
+            environment=ComputationalEnvironment.from_kg_object(simulation_object.environment, client),
+            launch_config=LaunchConfiguration.from_kg_object(simulation_object.launch_configuration, client),
+            start_time=simulation_object.start_time,
+            end_time=simulation_object.end_time,
+            started_by=Person.from_kg_object(simulation_object.started_by, client),
+            status=getattr(Status, status_name_map[simulation_object.status.resolve(client).name]),
+            resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(simulation_object.resource_usages)],
+            tags=as_list(simulation_object.tags),
+            recipe_id=simulation_object.recipe.uuid if simulation_object.recipe else None
         )
 
     def to_kg_object(self, client):
@@ -119,6 +122,9 @@ class Simulation(Computation):
             resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
         else:
             resource_usage = None
+        recipe_obj = None
+        if self.recipe_id:
+            recipe_obj = omcmp.WorkflowRecipeVersion.from_uuid(str(self.recipe_id), client, scope="any")
         if self.id is None:
             self.id = uuid4()
         obj = self.__class__.kg_cls(
@@ -134,7 +140,8 @@ class Simulation(Computation):
             #was_informed_by= # todo
             status=ACTION_STATUS_TYPES[self.status.value],
             resource_usages=resource_usage,
-            tags=self.tags
+            tags=self.tags,
+            recipe=recipe_obj
         )
         return obj
 

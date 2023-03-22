@@ -583,19 +583,23 @@ class ComputationalEnvironment(BaseModel):
     @classmethod
     def from_kg_object(cls, env_object, client):
         env = env_object.resolve(client, scope="any")
-        if env.hardware:
-            hardware = HardwareSystem(env.hardware.resolve(client, scope="any").name)
-        else:
-            hardware = None
-        if env.configuration:
-            config = env.configuration.resolve(client, scope="any").configuration
-        else:
-            config = None
+        hardware = None
+        config = None
+        if env:
+            if env.hardware:
+                hardware_obj = env.hardware.resolve(client, scope="any")
+                if hardware_obj:
+                    hardware = HardwareSystem(hardware_obj.name)
+
+            if env.configuration:
+                config_obj = env.configuration.resolve(client, scope="any")
+                if config_obj:
+                    config = json.loads(config_obj.configuration)
         return cls(
             id=client.uuid_from_uri(env.id),
             name=env.name,
             hardware=hardware,
-            configuration=json.loads(config),
+            configuration=config,
             software=[SoftwareVersion.from_kg_object(obj, client) for obj in as_list(env.software)],
             description=env.description
         )

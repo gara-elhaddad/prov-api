@@ -43,7 +43,7 @@ router = APIRouter()
 
 @router.get("/workflows/", response_model=List[WorkflowExecution])
 def query_workflows(
-    space: str = Query("myspace", description="Knowledge Graph space to search in"),
+    space: str = Query(None, description="Knowledge Graph space to search in"),
     recipe_id: UUID = Query(None, description="Return runs of the workflow recipe with the given ID"),
     tags: List[str] = Query(None, description="Return workflows with _all_ of these tags"),
     size: int = Query(100, description="Number of records to return"),

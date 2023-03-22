@@ -45,6 +45,8 @@ class DataAnalysis(Computation):
 
     @classmethod
     def from_kg_object(cls, data_analysis_object, client):
+        if isinstance(data_analysis_object, KGProxy):
+            data_analysis_object = data_analysis_object.resolve(client, scope="any")
         assert isinstance(data_analysis_object, omcmp.DataAnalysis)
         obj = data_analysis_object.resolve(client, scope="any")
         inputs = []
@@ -69,7 +71,8 @@ class DataAnalysis(Computation):
             started_by=Person.from_kg_object(obj.started_by, client),
             status=getattr(Status, status_name_map[obj.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(ru, client) for ru in as_list(obj.resource_usages)],
-            tags=as_list(obj.tags)
+            tags=as_list(obj.tags),
+            recipe_id=data_analysis_object.recipe.uuid if data_analysis_object.recipe else None
         )
 
     def to_kg_object(self, client):
@@ -82,6 +85,9 @@ class DataAnalysis(Computation):
         environment = self.environment.to_kg_object(client)
         launch_configuration = self.launch_config.to_kg_object(client)
         resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
+        recipe_obj = None
+        if self.recipe_id:
+            recipe_obj = omcmp.WorkflowRecipeVersion.from_uuid(str(self.recipe_id), client, scope="any")
         if self.id is None:
             self.id = uuid4()
         obj = self.__class__.kg_cls(
@@ -97,7 +103,8 @@ class DataAnalysis(Computation):
             #was_informed_by= # todo
             status=ACTION_STATUS_TYPES[self.status.value],
             resource_usages=resource_usage,
-            tags=self.tags
+            tags=self.tags,
+            recipe=recipe_obj
         )
         return obj
 
