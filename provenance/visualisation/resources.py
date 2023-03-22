@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
-from fairgraph.base_v3 import as_list
+from fairgraph.base import as_list
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
@@ -98,7 +98,7 @@ def query_visualisations(
     # filter by simulation
     if simulation:
         # todo: add a query for released simulations
-        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="in progress")
+        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="any")
         if simulation_obj is None:
             raise HTTPException(
                 status_code=status_codes.HTTP_404_NOT_FOUND,
@@ -111,13 +111,13 @@ def query_visualisations(
     # filter by software
     if software:
         filters["inputs"].extend(as_list(software))
-        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress", space=space)
+        environments = omcmp.Environment.list(kg_client, software=software, scope="any", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by hardware platform
     if platform:
-        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space="common")
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="any", space="common")
         # todo: handle different versions of hardware platforms
-        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="any", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by status
     if status:
@@ -130,7 +130,7 @@ def query_visualisations(
         if key in filters and len(filters[key]) == 0:
             del filters[key]
 
-    visualisation_objects = omcmp.Visualization.list(kg_client, scope="in progress", api="query",
+    visualisation_objects = omcmp.Visualization.list(kg_client, scope="any", api="query",
                                                     size=size, from_index=from_index,
                                                     space=space)
     return [obj.from_kg_object(kg_client) for obj in visualisation_objects]
@@ -158,7 +158,7 @@ def get_visualisation(visualisation_id: UUID, token: HTTPAuthorizationCredential
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
-        visualisation_object = omcmp.Visualization.from_uuid(str(visualisation_id), kg_client, scope="in progress")
+        visualisation_object = omcmp.Visualization.from_uuid(str(visualisation_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("visualisation", visualisation_id)
     if visualisation_object is None:
@@ -196,7 +196,7 @@ def update_visualisation(
     return patch_computation(Visualisation, omcmp.Visualization, visualisation_id, patch, token)
 
 
-@router.delete("/analyses/{visualisation_id}", response_model=Visualisation)
+@router.delete("/visualisations/{visualisation_id}", response_model=Visualisation)
 def delete_visualisation(visualisation_id: UUID, token: HTTPAuthorizationCredentials = Depends(auth)):
     """
     Delete a visualisation record.

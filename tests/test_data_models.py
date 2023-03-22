@@ -27,7 +27,7 @@ import provenance.workflows.examples
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
-from fairgraph.base_v3 import IRI
+from fairgraph.base import IRI
 
 
 EXAMPLES = provenance.common.examples.EXAMPLES
@@ -73,7 +73,7 @@ class MockKGClient:
                 'vocab:accessibility': {'@id': "kg:b2ff7a47-b349-48d7-8ce4-cf51868675f1",
                                         '@type': ['https://openminds.ebrains.eu/controlledTerms/ProductAccessibility']},
                 'vocab:fullDocumentation': {'@id': 'http://example.com',
-                                            '@type': ['https://openminds.ebrains.eu/core/URL']},
+                                            '@type': ['https://openminds.ebrains.eu/core/WebResource']},
                 'vocab:fullName': 'fake model for testing',
                 'vocab:releaseDate': '1999-12-31T23:59:59',
                 'vocab:shortName': 'fake-model-for-testing',
@@ -129,7 +129,7 @@ class TestDataAnalysis:
                 hash=omcore.Hash(algorithm="SHA-1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
                 iri=IRI("https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json"),
                 name="InputResistance_data.json",
-                storage_size=omcore.QuantitativeValue(value=34.0, units=omterms.UnitOfMeasurement(name="byte"))
+                storage_size=omcore.QuantitativeValue(value=34.0, unit=omterms.UnitOfMeasurement(name="byte"))
             ),
             omcore.SoftwareVersion(
                 name="Elephant",
@@ -150,7 +150,7 @@ class TestDataAnalysis:
                         },
                         indent=2
                     ),
-                    definition_format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
+                    format=omcore.ContentType(name="application/json", id=f"{ID_PREFIX}/00000000-0000-0000-0000-000000000000"),
                     lookup_label="hardware configuration for SpiNNaker 1M core machine"
             ),
             software=[
@@ -175,8 +175,8 @@ class TestDataAnalysis:
             outputs=outputs,
             environment=environment,
             launch_configuration=launch_configuration,
-            started_at_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
-            ended_at_time=datetime(2021, 5, 28, 16, 32, 58,  597000, tzinfo=timezone.utc),
+            start_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
+            end_time=datetime(2021, 5, 28, 16, 32, 58,  597000, tzinfo=timezone.utc),
             started_by=started_by,
             status=omterms.ActionStatusType(name="potential"),  # i.e. queued
             resource_usages=resource_usage,

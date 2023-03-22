@@ -27,7 +27,7 @@ from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as 
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
-from fairgraph.base_v3 import as_list
+from fairgraph.base import as_list
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
@@ -86,9 +86,9 @@ def query_simulations(
         filters["inputs"].append(simulator)
     # filter by hardware platform
     if platform:
-        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space="common")
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="any", space="common")
         # todo: handle different versions of hardware platforms
-        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="any", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by status
     if status:
@@ -101,7 +101,7 @@ def query_simulations(
         if key in filters and len(filters[key]) == 0:
             del filters[key]
 
-    simulation_objects = omcmp.Simulation.list(kg_client, scope="in progress", api="query",
+    simulation_objects = omcmp.Simulation.list(kg_client, scope="any", api="query",
                                                size=size, from_index=from_index,
                                                space=space)
     return [obj.from_kg_object(kg_client) for obj in simulation_objects]
@@ -110,7 +110,7 @@ def query_simulations(
 @router.post("/simulations/", response_model=Simulation, status_code=status_codes.HTTP_201_CREATED)
 def create_simulation(
     simulation: Simulation,
-    space: str = "myspace",
+    space: str = Query("myspace", description="Knowledge Graph space to save to"),
     token: HTTPAuthorizationCredentials = Depends(auth)
 ):
     """
@@ -129,11 +129,11 @@ def get_simulation(simulation_id: UUID, token: HTTPAuthorizationCredentials = De
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
-        simulation_object = omcmp.Visualization.from_uuid(str(simulation_id), kg_client, scope="in progress")
+        simulation_object = omcmp.Visualization.from_uuid(str(simulation_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("simulation", simulation_id)
     if simulation_object is None:
-        raise NotFoundError("simulation", simulation_id)    
+        raise NotFoundError("simulation", simulation_id)
     return Simulation.from_kg_object(simulation_object, kg_client)
 
 

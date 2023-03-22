@@ -21,7 +21,10 @@ docstring goes here
 
 import logging
 from uuid import UUID, uuid4
-from typing import Literal
+from typing import Literal, List, Union
+
+from pydantic import Field
+
 from fairgraph.base import KGProxy
 from fairgraph.utility import as_list
 
@@ -31,22 +34,24 @@ import fairgraph.openminds.core as omcore
 from ..common.data_models import (
     Computation, ComputationPatch, Status, Person, ResourceUsage, LaunchConfiguration,
     ComputationalEnvironment, File, SoftwareVersion, ACTION_STATUS_TYPES, status_name_map,
-    ComputationType
+    ModelVersionReference, DatasetVersionReference
 )
 
 logger = logging.getLogger("ebrains-prov-api")
 
 
-class DataAnalysis(Computation):
-    """Record of a data analysis"""
-    kg_cls = omcmp.DataAnalysis
+class DataCopy(Computation):
+    """Record of a data copy operation"""
+    kg_cls = omcmp.DataCopy
 
-    type: Literal["data analysis"]
+    input: List[Union[File, ModelVersionReference, DatasetVersionReference, SoftwareVersion]] = Field(...,
+        description="Items to be copied (models, datasets, data files, and/or software)")  # todo: add ValidationTestVersion
+    type: Literal["data transfer"]
 
     @classmethod
-    def from_kg_object(cls, data_analysis_object, client):
-        assert isinstance(data_analysis_object, omcmp.DataAnalysis)
-        obj = data_analysis_object.resolve(client, scope="any")
+    def from_kg_object(cls, data_copy_object, client):
+        assert isinstance(data_copy_object, omcmp.DataCopy)
+        obj = data_copy_object.resolve(client, scope="any")
         inputs = []
         for input in as_list(obj.inputs):
             if isinstance(input, KGProxy):
@@ -55,6 +60,10 @@ class DataAnalysis(Computation):
                 inputs.append(File.from_kg_object(input, client))
             elif isinstance(input, omcore.SoftwareVersion):
                 inputs.append(SoftwareVersion.from_kg_object(input, client))
+            elif isinstance(input, omcore.ModelVersion):
+                inputs.append(ModelVersionReference.from_kg_object(obj, client))
+            elif isinstance(input, omcore.DatasetVersion):
+                inputs.append(DatasetVersionReference.from_kg_object(obj, client))
             else:
                 raise TypeError(f"unexpected object type in inputs: {type(input)}")
         return cls(
@@ -86,7 +95,7 @@ class DataAnalysis(Computation):
             self.id = uuid4()
         obj = self.__class__.kg_cls(
             id=client.uri_from_uuid(str(self.id)),
-            lookup_label=f"Data analysis by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
+            lookup_label=f"Data copy by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
             inputs=inputs,
             outputs=outputs,
             environment=environment,
@@ -102,11 +111,11 @@ class DataAnalysis(Computation):
         return obj
 
 
-class DataAnalysisPatch(ComputationPatch):
-    """Correction of or update to a record of a data analysis"""
+class DataCopyPatch(ComputationPatch):
+    """Correction of or update to a record of a data copy operation"""
 
-    def apply_to_kg_object(self, data_analysis_object, client):
-        obj = data_analysis_object
+    def apply_to_kg_object(self, data_copy_object, client):
+        obj = data_copy_object
         update_label = False
         if self.input:
             obj.inputs = [inp.to_kg_object(client) for inp in self.input]
@@ -131,5 +140,5 @@ class DataAnalysisPatch(ComputationPatch):
         if self.tags:
             obj.tags = as_list(self.tags)
         if update_label:
-            obj.lookup_label = f"Data analysis by {obj.started_by.full_name} on {obj.started_at_time.isoformat()} [{obj.id.hex[:7]}]"
+            obj.lookup_label = f"Data copy by {obj.started_by.full_name} on {obj.started_at_time.isoformat()} [{obj.id.hex[:7]}]"
         return obj

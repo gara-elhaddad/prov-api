@@ -3,7 +3,7 @@ import itertools
 from fastapi import HTTPException, status
 
 import fairgraph.openminds.computation as omcmp
-from fairgraph.base_v3 import as_list
+from fairgraph.base import as_list
 
 from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
 
@@ -12,7 +12,7 @@ from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
 def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
     if pydantic_obj.id is not None:
-        kg_computation_object = fairgraph_cls.from_uuid(str(pydantic_obj.id), kg_client, scope="in progress")
+        kg_computation_object = fairgraph_cls.from_uuid(str(pydantic_obj.id), kg_client, scope="any")
         if kg_computation_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -28,7 +28,7 @@ def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
 
 def replace_computation(pydantic_cls, fairgraph_cls, computation_id, pydantic_obj, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="in progress")
+    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -48,7 +48,7 @@ def replace_computation(pydantic_cls, fairgraph_cls, computation_id, pydantic_ob
 
 def patch_computation(pydantic_cls, fairgraph_cls, computation_id, patch, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="in progress")
+    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -67,7 +67,7 @@ def patch_computation(pydantic_cls, fairgraph_cls, computation_id, patch, token)
 
 def delete_computation(fairgraph_cls, computation_id, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="in progress")
+    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,

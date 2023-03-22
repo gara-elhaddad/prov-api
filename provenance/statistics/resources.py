@@ -50,13 +50,13 @@ def query_spaces(
     counts = []
     for space in spaces_with_workflows:
         try:
-            count = omcmp.WorkflowExecution.count(kg_client, scope="in progress", space=space)
+            count = omcmp.WorkflowExecution.count(kg_client, scope="any", space=space)
         except Exception as err:
             logger.warning(err)
             count = 0
         counts.append(
             WorkflowCount(
-                space=space, 
+                space=space,
                 count=count
             )
         )

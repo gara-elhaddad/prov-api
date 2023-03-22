@@ -5,7 +5,7 @@ from enum import Enum
 from uuid import UUID
 from pydantic import AnyHttpUrl, AnyUrl, BaseModel, Field
 
-from fairgraph.base_v3 import as_list, IRI
+from fairgraph.base import as_list, IRI
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
@@ -48,7 +48,7 @@ class WorkflowRecipe(BaseModel):
 
     @classmethod
     def from_kg_object(cls, recipe_version, client):
-        recipe = omcmp.WorkflowRecipe.list(client, scope="in progress",
+        recipe = omcmp.WorkflowRecipe.list(client, scope="any",
                                            #space=recipe_version.space,
                                            versions=recipe_version)[0]
         if recipe_version.custodians:
@@ -65,14 +65,14 @@ class WorkflowRecipe(BaseModel):
                           for p in as_list(recipe.developers)]
         if recipe_version.format:
             type_ = content_type_lookup.get(
-                recipe_version.format.resolve(client, scope="in progress").name,
+                recipe_version.format.resolve(client, scope="any").name,
                 None)
         else:
             type_ = None
         if recipe_version.homepage:
-            homepage = str(recipe_version.homepage.resolve(client, scope="in progress").url)
+            homepage = recipe_version.homepage.value
         elif recipe.homepage:
-            homepage = str(recipe.homepage.resolve(client, scope="in progress").url)
+            homepage = recipe.homepage.value
         else:
             homepage = None
         return cls(
@@ -86,7 +86,7 @@ class WorkflowRecipe(BaseModel):
             full_documentation=recipe_version.full_documentation,
             homepage=homepage,
             keywords=recipe_version.keywords,
-            location=str(recipe_version.repository.resolve(client, scope="in progress").iri),
+            location=str(recipe_version.repository.resolve(client, scope="any").iri),
             version_identifier=recipe_version.version_identifier,
             version_innovation=recipe_version.version_innovation
         )
@@ -110,7 +110,7 @@ class WorkflowRecipe(BaseModel):
             full_documentation=self.full_documentation,
             #funding',
             #has_components',
-            homepage=omcore.URL(url=self.homepage),
+            homepage=IRI(str(self.homepage)),
             #how_to_cite',
             #is_alternative_version_of',
             #is_new_version_of',
@@ -123,7 +123,7 @@ class WorkflowRecipe(BaseModel):
                 name=get_repository_name(self.location),
                 iri=get_repository_iri(self.location),
                 hosted_by=get_repository_host(self.location),
-                repository_type=get_repository_type(self.location),
+                type=get_repository_type(self.location),
             ),
             #support_channels',
             version_identifier=self.version_identifier,

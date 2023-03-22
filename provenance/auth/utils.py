@@ -8,7 +8,7 @@ import json
 import requests
 from fastapi import HTTPException, status
 
-from fairgraph.client_v3 import KGv3Client as KGClient
+from fairgraph.client import KGClient
 
 from .. import settings
 from . import oauth

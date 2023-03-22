@@ -8,11 +8,11 @@ import pytest
 from pydantic import parse_obj_as
 from fastapi.testclient import TestClient
 
-from fairgraph.client_v3 import KGv3Client as KGClient
+from fairgraph.client import KGClient
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
-from fairgraph.base_v3 import IRI, as_list
+from fairgraph.base import IRI, as_list
 
 sys.path.append(".")  # run tests in root directory of project
 from provenance.main import app
@@ -73,7 +73,7 @@ def input_file_obj(units):
         hash=omcore.Hash(algorithm="SHA-1", digest="716c29320b1e329196ce15d904f7d4e3c7c46685"),
         iri=IRI("https://object.cscs.ch/v1/AUTH_c0a333ecf7c045809321ce9d9ecdfdea/VF_paper_demo/obs_data/InputResistance_data.json"),
         name="InputResistance_data.json",
-        storage_size=omcore.QuantitativeValue(value=34.0, units=units["byte"])
+        storage_size=omcore.QuantitativeValue(value=34.0, unit=units["byte"])
     )
     obj.save(kg_client, space=TEST_SPACE, recursive=True)
     yield obj
@@ -90,7 +90,7 @@ def output_file_objs(units):
             hash=omcore.Hash(algorithm="SHA-1", digest="9006f7ca30ee32d210249ba125dfd96d18b6669e"),
             iri=IRI("https://drive.ebrains.eu/f/61ceb5c4aa3c4468a26c/"),
             name="output_files/Freund_SGA1_T1.2.5_HC-awake-ephys_HBP_1_cell1_ephys__160712_cell1_LFP.png",
-            storage_size=omcore.QuantitativeValue(value=60715.0, units=units["byte"])
+            storage_size=omcore.QuantitativeValue(value=60715.0, unit=units["byte"])
         ),
         omcore.File(
             id=f"{ID_PREFIX}/{uuid4()}",
@@ -99,7 +99,7 @@ def output_file_objs(units):
             hash=omcore.Hash(algorithm="SHA-1", digest="a006f7ca30ee32d210249ba125dfd96d18b6669f"),
             iri=IRI("https://gpfs-proxy.brainsimulation.eu/cscs/myproject/output_data/simulation_results.nwb"),
             name="output_data/simulation_results.nwb",
-            storage_size=omcore.QuantitativeValue(value=605888.0, units=units["byte"])
+            storage_size=omcore.QuantitativeValue(value=605888.0, unit=units["byte"])
         ),
     ]
     for obj in objs:
@@ -158,7 +158,7 @@ def environment_obj(software_version_objs, hardware_obj):
                 "parameter2": "value2"
             }, indent=2),
             lookup_label="hardware configuration for fake hardware",
-            definition_format=omcore.ContentType(name="application/json")
+            format=omcore.ContentType(name="application/json")
         ),
         software=software_version_objs[1:4],
         description="Default environment on fake hardware"
@@ -199,8 +199,8 @@ def data_analysis_obj(person_obj, input_file_obj, output_file_objs, software_ver
         outputs=output_file_objs[0:1],
         environment=environment_obj,
         launch_configuration=launch_config_obj,
-        started_at_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
-        ended_at_time=datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc),
+        start_time=datetime(2021, 5, 28, 16, 32, 58, 597000, tzinfo=timezone.utc),
+        end_time=datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc),
         started_by=person_obj,
         status=omterms.ActionStatusType(name="potential"),  # i.e. queued
         resource_usages=resource_usage,
@@ -223,8 +223,8 @@ def visualisation_obj(person_obj, input_file_obj, output_file_objs, software_ver
         outputs=output_file_objs[0:1],
         environment=environment_obj,
         launch_configuration=launch_config_obj,
-        started_at_time=datetime(2021, 6, 28, 16, 32, 58, tzinfo=timezone.utc),
-        ended_at_time=datetime(2021, 6, 28, 16, 33, 27, tzinfo=timezone.utc),
+        start_time=datetime(2021, 6, 28, 16, 32, 58, tzinfo=timezone.utc),
+        end_time=datetime(2021, 6, 28, 16, 33, 27, tzinfo=timezone.utc),
         started_by=person_obj,
         status=omterms.ActionStatusType(name="potential"),
         resource_usages=resource_usage,
@@ -251,7 +251,7 @@ def test_about():
 class TestFixtures:
     def test_fixtures(self, data_analysis_obj):
         assert data_analysis_obj.started_by.given_name == "Bilbo"
-        assert data_analysis_obj.ended_at_time == datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc)
+        assert data_analysis_obj.end_time == datetime(2021, 5, 28, 18, 32, 58,  597000, tzinfo=timezone.utc)
 
 
 @pytest.mark.skipif(not have_kg_connection, reason=no_kg_err_msg)
@@ -303,6 +303,7 @@ class TestGetDataAnalysis:
                                 "value": "9006f7ca30ee32d210249ba125dfd96d18b6669e"},
                         "location": "https://drive.ebrains.eu/f/61ceb5c4aa3c4468a26c/",
                         "size": 60715}],
+            "recipe_id": None,
             "resource_usage": [{"units": "hour", "value": 2.0}],
             "start_time": "2021-05-28T16:32:58.597000+00:00",
             "started_by": {"family_name": "Baggins",
@@ -450,6 +451,7 @@ class TestGetVisualisation:
                                 "value": "9006f7ca30ee32d210249ba125dfd96d18b6669e"},
                         "location": "https://drive.ebrains.eu/f/61ceb5c4aa3c4468a26c/",
                         "size": 60715}],
+            "recipe_id": None,
             "resource_usage": [{"units": "second", "value": 29.0}],
             "start_time": "2021-06-28T16:32:58+00:00",
             "started_by": {"family_name": "Baggins",
@@ -539,7 +541,7 @@ class TestCreateSimulation:
             "type": "simulation"
         }
         token = kg_client.token
-        response = test_client.post("/simulations/",
+        response = test_client.post(f"/simulations/?space={TEST_SPACE}",
                                     json=data,
                                     headers={"Authorization": f"Bearer {token}"})
         assert response.status_code == 201

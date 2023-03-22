@@ -18,13 +18,14 @@ docstring goes here
    limitations under the License.
 """
 
-from typing import List, Union
+from typing import List, Union, Any
 from uuid import UUID
 from typing_extensions import Annotated
 
+import json
 from pydantic import BaseModel, Field
 
-from fairgraph.base_v3 import KGProxy
+from fairgraph.base import KGProxy
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 from ..common.data_models import Person
@@ -32,6 +33,8 @@ from ..simulation.data_models import Simulation
 from ..dataanalysis.data_models import DataAnalysis
 from ..visualisation.data_models import Visualisation
 from ..optimisation.data_models import Optimisation
+from ..datacopy.data_models import DataCopy
+from ..generic.data_models import GenericComputation
 
 
 class WorkflowRecipe(BaseModel):
@@ -40,7 +43,7 @@ class WorkflowRecipe(BaseModel):
 
 # see https://stackoverflow.com/questions/70914419/how-to-get-pydantic-to-discriminate-on-a-field-within-listuniontypea-typeb
 _Computation = Annotated[
-    Union[Simulation, DataAnalysis, Visualisation, Optimisation],
+    Union[Simulation, DataAnalysis, Visualisation, Optimisation, DataCopy, GenericComputation],
     Field(discriminator="type")
 ]
 
@@ -49,6 +52,7 @@ class WorkflowExecution(BaseModel):
     kg_cls = omcmp.WorkflowExecution
 
     id: UUID = None
+    configuration: dict = None
     stages: List[_Computation] = Field(
         ...,
         description="A workflow record is specified by the list of computations that were carried out. "
@@ -65,11 +69,13 @@ class WorkflowExecution(BaseModel):
             omcmp.DataAnalysis: DataAnalysis,
             omcmp.Visualization: Visualisation,
             omcmp.Simulation: Simulation,
-            omcmp.Optimization: Optimisation
+            omcmp.Optimization: Optimisation,
+            omcmp.DataCopy: DataCopy,
+            omcmp.GenericComputation: GenericComputation
         }
         def get_class(obj):
             if isinstance(obj, KGProxy):
-                robj = obj.resolve(client, scope="in progress")
+                robj = obj.resolve(client, scope="any")
                 return robj.__class__
             else:
                 return obj.__class__
@@ -79,6 +85,7 @@ class WorkflowExecution(BaseModel):
         ]
         return cls(
             id=weo.uuid,
+            configuration=weo.configuration.to_json(),
             stages=stages,
             recipe_id=weo.recipe.uuid if weo.recipe else None,
             started_by=Person.from_kg_object(weo.started_by, client) if weo.started_by else None
@@ -94,7 +101,7 @@ class WorkflowExecution(BaseModel):
             started_by = omcore.Person.me(client)
         stages = [stage.to_kg_object(client) for stage in self.stages]
         if self.recipe_id:
-            recipe = omcmp.WorkflowRecipeVersion.from_id(str(self.recipe_id), client, scope="in progress")  # todo: also search scope="released"
+            recipe = omcmp.WorkflowRecipeVersion.from_id(str(self.recipe_id), client, scope="any")  # todo: also search scope="released"
         else:
             recipe = None
         # todo: error message if recipe is not found
@@ -102,6 +109,11 @@ class WorkflowExecution(BaseModel):
             id=client.uri_from_uuid(str(self.id)),
             started_by=started_by,
             recipe=recipe,
-            stages=stages
+            stages=stages,
+            configuration=omcore.Configuration(
+                configuration=json.dumps(self.configuration, indent=2),
+                format=KGProxy(cls=omcore.ContentType,  # application/json
+                               uri="https://kg.ebrains.eu/api/instances/098cd755-65bc-4e77-b3eb-7a940fff829a")
+            )
         )
         return obj

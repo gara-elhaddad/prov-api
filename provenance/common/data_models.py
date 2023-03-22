@@ -25,7 +25,6 @@ from typing import List, Union, Optional, Any
 import re
 import hashlib
 import json
-from fairgraph.registry import lookup_by_id
 from fairgraph.utility import as_list
 
 try:
@@ -36,7 +35,7 @@ from decimal import Decimal
 from datetime import datetime
 from pydantic import BaseModel, AnyUrl, Field, Json
 
-from fairgraph.base_v3 import KGProxy as KGProxy, IRI, as_list
+from fairgraph.base import KGProxy as KGProxy, IRI, as_list
 #from fairgraph.openminds import controlledterms
 from fairgraph.openminds.core.miscellaneous.quantitative_value import QuantitativeValue
 import fairgraph.openminds.core as omcore
@@ -60,7 +59,7 @@ status_name_map = {
 
 def _get_action_status_types():
     kg_client_service_account = get_kg_client_for_service_account()
-    return ActionStatusType.list(kg_client_service_account, scope="in progress",
+    return ActionStatusType.list(kg_client_service_account, scope="released",
                                  api="core", space="controlled", size=10)
 
 
@@ -92,7 +91,7 @@ def get_identifier(iri, prefix):
 def _get_units_of_measurement():
     # pre-fetch units of measurement
     kg_client_service_account = get_kg_client_for_service_account()
-    units_objects = UnitOfMeasurement.list(kg_client_service_account, api="core", scope="in progress", space="controlled")
+    units_objects = UnitOfMeasurement.list(kg_client_service_account, api="core", scope="released", space="controlled")
     # the follow addition is a temporary workaround with a locally-generated id until core-hour is added
     units_objects.append(UnitOfMeasurement(name="core-hour", id="https://kg.ebrains.eu/api/instances/686f4d65-bdc7-4f69-bf32-4c9f09028541"))
     return units_objects
@@ -109,7 +108,7 @@ UNITS = {u: unit_obj for u, unit_obj in zip(Units, UNITS)}
 
 def _get_content_types():
     kg_client_service_account = get_kg_client_for_service_account()
-    content_types = omcore.ContentType.list(kg_client_service_account, api="core", scope="in progress", space="controlled", size=10000)
+    content_types = omcore.ContentType.list(kg_client_service_account, api="core", scope="released", space="controlled", size=10000)
     return content_types
 
 
@@ -142,7 +141,7 @@ class Digest(BaseModel):
 def _get_hosting_organizations():
     kg_client_service_account = get_kg_client_for_service_account()
     hosting_orgs = {
-        name: omcore.Organization.list(kg_client_service_account, scope="in progress", space="common", alias=name)[0]
+        name: omcore.Organization.list(kg_client_service_account, scope="any", space="common", alias=name)[0]
         for name in ("EBRAINS", "GitHub", "Yale", "EBI", "CERN", "CSCS", "CNRS")
     }
     # CSCS = KGProxy(omcore.Organization, "https://kg.ebrains.eu/api/instances/e3f16a1a-184e-447d-aced-375c00ec4d41")
@@ -178,6 +177,7 @@ file_location_patterns = {
     "http://cns.iaf.cnrs-gif.fr": FILE_HOSTS["CNRS"],
     "https://gpfs-proxy.brainsimulation.eu/cscs": FILE_HOSTS["CSCS"],
     #"https://gpfs-proxy.brainsimulation.eu/jsc": JSC,
+    "https://data-proxy.ebrains.eu": FILE_HOSTS["EBRAINS"],
 }
 
 
@@ -190,8 +190,9 @@ def get_repository_host(url):
 
 CSCS_pattern = r"https://object\.cscs\.ch/v1/(?P<proj>\w+)/(?P<container_name>[\w\.-]+)/(?P<path>\S*)"
 GPFS_proxy_pattern = r"https://gpfs-proxy\.brainsimulation\.eu/(?P<site>\w+)/(?P<project_name>[\w-]+)/(?P<path>\S*)"
-EBRAINS_Gitlab_pattern = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)/-/"
-EBRAINS_Gitlab_pattern2 = r"https://gitlab.ebrains.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)"
+EBRAINS_Gitlab_pattern = r"https://gitlab\.ebrains\.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)/-/"
+EBRAINS_Gitlab_pattern2 = r"https://gitlab\.ebrains\.eu/(?P<org>[\w-]+)/(?P<project_name>[/\w-]+)"
+EBRAINS_data_proxy_pattern = r"https://data-proxy\.ebrains\.eu/api/v1/buckets/(?P<bucket_name>[\w-]+)/[/\w\.-]+"
 
 def get_repository_iri(url):
     templates = (
@@ -199,6 +200,7 @@ def get_repository_iri(url):
         (GPFS_proxy_pattern, "https://gpfs-proxy.brainsimulation.eu/{site}/{project_name}"),
         (EBRAINS_Gitlab_pattern, "https://gitlab.ebrains.eu/{org}/{project_name}"),
         (EBRAINS_Gitlab_pattern2, "https://gitlab.ebrains.eu/{org}/{project_name}"),
+        (EBRAINS_data_proxy_pattern, "https://data-proxy.ebrains.eu/api/v1/buckets/{bucket_name}"),
     )
     for pattern, template in templates:
         match = re.match(pattern, url)
@@ -215,7 +217,8 @@ def get_repository_name(url):
         (CSCS_pattern, "container_name"),
         (GPFS_proxy_pattern, "project_name"),
         (EBRAINS_Gitlab_pattern, "project_name"),
-        (EBRAINS_Gitlab_pattern2, "project_name")
+        (EBRAINS_Gitlab_pattern2, "project_name"),
+        (EBRAINS_data_proxy_pattern, "bucket_name"),
     )
     for pattern, key in templates:
         match = re.match(pattern, url)
@@ -236,7 +239,7 @@ def _get_repository_types():
 REPOSITORY_TYPES = _get_repository_types()
 
 def get_repository_type(url):
-    if url.startswith("https://object.cscs.ch"):
+    if url.startswith("https://object.cscs.ch") or url.startswith("https://data-proxy.ebrains.eu"):
         return REPOSITORY_TYPES["Swift repository"]
     elif url.startswith("https://gpfs-proxy.brainsimulation.eu"):
         return REPOSITORY_TYPES["GPFS repository"]
@@ -267,9 +270,9 @@ class File(BaseModel):
     @classmethod
     def from_kg_object(cls, file_object, client):
         if isinstance(file_object, KGProxy):
-            file_object = file_object.resolve(client, scope="in progress")
+            file_object = file_object.resolve(client, scope="any")
         if file_object.format:
-            name = file_object.format.resolve(client, scope="in progress").name
+            name = file_object.format.resolve(client, scope="any").name
             format = ContentType(name)
         else:
             format = None
@@ -306,7 +309,7 @@ class File(BaseModel):
                 hosted_by=get_repository_host(self.location),
                 iri=get_repository_iri(self.location),
                 name=get_repository_name(self.location),
-                repository_type=get_repository_type(self.location)
+                type=get_repository_type(self.location)
             )
         else:
             file_repository = None
@@ -351,8 +354,11 @@ class File(BaseModel):
 
 def _get_hardware_systems():
     kg_client_service_account = get_kg_client_for_service_account()
+    hardware_systems = omcmp.HardwareSystem.list(kg_client_service_account, scope="any", space="common")
+    for obj in hardware_systems:
+        obj.allow_update = False
     return {
-        obj.name: obj for obj in omcmp.HardwareSystem.list(kg_client_service_account, scope="in progress", space="common")
+        obj.name: obj for obj in hardware_systems
     }
 
 
@@ -414,13 +420,13 @@ class NumericalParameter(BaseModel):
         return cls(
             name=param.name,
             value=param.values[0].value,
-            units=Units(param.values[0].units)
+            units=Units(param.values[0].unit)
         )
 
     def to_kg_object(self, client):
         return omcore.NumericalProperty(
             name=self.name,
-            values=QuantitativeValue(value=self.value, units=UNITS[self.units])
+            values=QuantitativeValue(value=self.value, unit=UNITS[self.units])
         )
 
 
@@ -477,7 +483,7 @@ class Person(BaseModel):
 
     @classmethod
     def from_kg_object(cls, person, client):
-        person = person.resolve(client, scope="in progress")
+        person = person.resolve(client, scope="any")
         orcid = None
         if person.digital_identifiers:
             for digid in as_list(person.digital_identifiers):
@@ -485,7 +491,7 @@ class Person(BaseModel):
                     orcid = digid.identifier
                     break
                 elif isinstance(digid, KGProxy) and digid.cls == omcore.ORCID:
-                    orcid = digid.resolve(client, scope="in progress").identifier
+                    orcid = digid.resolve(client, scope="any").identifier
                     break
         return cls(given_name=person.given_name, family_name=person.family_name,
                    orcid=orcid)
@@ -494,6 +500,9 @@ class Person(BaseModel):
         obj = omcore.Person(family_name=self.family_name, given_name=self.given_name)
         if self.orcid:
             obj.digital_identifiers = [omcore.ORCID(identifier=self.orcid)]
+        # allow creating missing authors (e.g. in private space) but not modifying existing ones
+        # (because often the user will not have the required permissions)
+        obj.allow_update = False
         return obj
 
 
@@ -515,7 +524,7 @@ class ResourceUsage(BaseModel):
     def from_kg_object(cls, resource_usage, client):
         return cls(
             value=resource_usage.value,
-            units=Units(resource_usage.unit.resolve(client, scope="in progress").name)
+            units=Units(resource_usage.unit.resolve(client, scope="any").name)
         )
 
     def to_kg_object(self, client):
@@ -540,7 +549,7 @@ class SoftwareVersion(BaseModel):
 
     @classmethod
     def from_kg_object(cls, software_version_object, client):
-        svo = software_version_object.resolve(client, scope="in progress")
+        svo = software_version_object.resolve(client, scope="any")
         return cls(
             id=client.uuid_from_uri(svo.id),
             software_name=svo.name,
@@ -550,6 +559,9 @@ class SoftwareVersion(BaseModel):
     def to_kg_object(self, client):
         obj = omcore.SoftwareVersion(name=self.software_name, alias=self.software_name,
                                      version_identifier=self.software_version)
+        # allow creating missing software instances (e.g. in private space)
+        # but not modifying existing ones
+        obj.allow_update = False
         return obj
 
 
@@ -570,13 +582,13 @@ class ComputationalEnvironment(BaseModel):
 
     @classmethod
     def from_kg_object(cls, env_object, client):
-        env = env_object.resolve(client, scope="in progress")
+        env = env_object.resolve(client, scope="any")
         if env.hardware:
-            hardware = HardwareSystem(env.hardware.resolve(client, scope="in progress").name)
+            hardware = HardwareSystem(env.hardware.resolve(client, scope="any").name)
         else:
             hardware = None
         if env.configuration:
-            config = env.configuration.resolve(client, scope="in progress").configuration
+            config = env.configuration.resolve(client, scope="any").configuration
         else:
             config = None
         return cls(
@@ -594,7 +606,7 @@ class ComputationalEnvironment(BaseModel):
             hardware=HARDWARE_SYSTEMS[self.hardware.value],
             configuration=omcore.Configuration(
                 configuration=json.dumps(self.configuration, indent=2),
-                definition_format=omcore.ContentType(name="application/json")
+                format=omcore.ContentType(name="application/json")
             ),
             software=[sv.to_kg_object(client) for sv in as_list(self.software)],
             description=self.description
@@ -629,7 +641,7 @@ class LaunchConfiguration(BaseModel):
 
     @classmethod
     def from_kg_object(cls, launch_config_object, client):
-        lco = launch_config_object.resolve(client, scope="in progress")
+        lco = launch_config_object.resolve(client, scope="any")
         if lco.environment_variables:
             env = ParameterSet.from_kg_object(lco.environment_variables, client)
         else:
@@ -661,7 +673,7 @@ class LaunchConfiguration(BaseModel):
 
 class Computation(BaseModel):
     """
-    Abstract base class, should not appear in documentation
+
     """
 
     id: Optional[UUID] = Field(None, description="IDs should be valid UUID v4 identifiers. If an ID is not supplied it will be generated by the Knowledge Graph")
@@ -676,6 +688,7 @@ class Computation(BaseModel):
     resource_usage: List[ResourceUsage] = None
     tags: List[str] = None
     description: str = None
+    recipe_id: UUID = None
 
 
 class ComputationPatch(Computation):
@@ -693,6 +706,7 @@ class ComputationPatch(Computation):
     status: Status = None
     resource_usage: List[ResourceUsage] = None
     tags: List[str] = None
+    recipe_id: UUID = None
 
 
 class ModelVersionReference(BaseModel):
@@ -710,4 +724,21 @@ class ModelVersionReference(BaseModel):
         return cls(model_version_id=UUID(model_version.uuid))
 
     def to_kg_object(self, client):
-        return omcore.ModelVersion.from_uuid(str(self.model_version_id), client, scope="in progress")
+        return omcore.ModelVersion.from_uuid(str(self.model_version_id), client, scope="any")
+
+
+class DatasetVersionReference(BaseModel):
+    """
+    Reference to a dataset version.
+
+    The KG API may be used to obtain further information about the dataset version using its ID.
+    """
+
+    dataset_version_id: UUID
+
+    @classmethod
+    def from_kg_object(cls, dataset_version, client):
+        return cls(dataset_version_id=UUID(dataset_version.uuid))
+
+    def to_kg_object(self, client):
+        return omcore.DatasetVersion.from_uuid(str(self.dataset_version_id), client, scope="any")

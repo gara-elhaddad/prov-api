@@ -22,7 +22,7 @@ from typing import List
 from uuid import UUID, uuid4
 import logging
 
-from fairgraph.base_v3 import as_list
+from fairgraph.base import as_list
 import fairgraph.openminds.computation as omcmp
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status as status_codes
@@ -55,7 +55,7 @@ def query_workflow_recipes(
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     recipes = omcmp.WorkflowRecipeVersion.list(
-        kg_client, scope="in progress", space=space, api="core",
+        kg_client, scope="any", space=space, api="core",
         from_index=from_index, size=size)
     return [WorkflowRecipe.from_kg_object(rcp, kg_client) for rcp in recipes]
 
@@ -69,7 +69,7 @@ def get_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = D
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
-        recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="in progress")
+        recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("workflow recipe", recipe_id)
     if recipe_object is None:
@@ -89,7 +89,7 @@ def create_workflow_recipe(
     kg_client = get_kg_client_for_user_account(token.credentials)
     requested_recipe_uuid = None
     if recipe.id is not None:
-        kg_recipe_version = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe.id), kg_client, scope="in progress")
+        kg_recipe_version = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe.id), kg_client, scope="any")
         if kg_recipe_version is not None:
             raise HTTPException(
                 status_code=status_codes.HTTP_400_BAD_REQUEST,
@@ -116,7 +116,7 @@ def create_workflow_recipe(
     # try to figure out if this is a new version of an existing recipe
     # todo in future: also search released workflow recipe
     alternative_versions = None
-    parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="in progress",
+    parent_workflow = omcmp.WorkflowRecipe.list(kg_client, space=space, scope="any",
                                                 name=recipe.name)
     if parent_workflow:
         if len(parent_workflow) > 1:
@@ -131,7 +131,7 @@ def create_workflow_recipe(
         else:
             parent_workflow = None
     if parent_workflow:
-        parent_workflow.resolve(kg_client, scope="in progress", follow_links=1)
+        parent_workflow.resolve(kg_client, scope="any", follow_links=1)
         if parent_workflow.versions:
             alternative_versions = sorted(
                 as_list(parent_workflow.versions),

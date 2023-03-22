@@ -26,7 +26,7 @@ import logging
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from fairgraph.base_v3 import as_list
+from fairgraph.base import as_list
 import fairgraph.openminds.core as omcore
 import fairgraph.openminds.computation as omcmp
 
@@ -97,7 +97,7 @@ def query_analyses(
     # filter by simulation
     if simulation:
         # todo: add a query for released simulations
-        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="in progress")
+        simulation_obj = omcmp.Simulation.from_id(str(simulation), kg_client, scope="any")
         if simulation_obj is None:
             raise HTTPException(
                 status_code=status_codes.HTTP_404_NOT_FOUND,
@@ -110,13 +110,13 @@ def query_analyses(
     # filter by software
     if software:
         filters["inputs"].extend(as_list(software))
-        environments = omcmp.Environment.list(kg_client, software=software, scope="in progress", space=space)
+        environments = omcmp.Environment.list(kg_client, software=software, scope="any", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by hardware platform
     if platform:
-        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="in progress", space="common")
+        hardware_obj = omcmp.HardwareSystem.by_name(platform.value, kg_client, scope="any", space="common")
         # todo: handle different versions of hardware platforms
-        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="in progress", space=space)
+        environments = omcmp.Environment.list(kg_client, hardware=hardware_obj, scope="any", space=space)
         filters["environment"].extend(as_list(environments))
     # filter by status
     if status:
@@ -133,7 +133,7 @@ def query_analyses(
 
     if len(filters) == 1:
         # common, simple case
-        data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
+        data_analysis_objects = omcmp.DataAnalysis.list(kg_client, scope="any", api="query",
                                                         size=size, from_index=from_index,
                                                         space=space, **filters[0])
     else:
@@ -141,9 +141,9 @@ def query_analyses(
         # inefficient if from_index is not 0
         data_analysis_objects = {}
         for filter in filters:
-            results = omcmp.DataAnalysis.list(kg_client, scope="in progress", api="query",
-                                                size=size, from_index=from_index,
-                                                space=space, **filter)
+            results = omcmp.DataAnalysis.list(kg_client, scope="any", api="query",
+                                              size=size, from_index=from_index,
+                                              space=space, **filter)
             for result in results:
                 data_analysis_objects[result.uuid] = result  # use dict to remove duplicates
 
@@ -174,7 +174,7 @@ def get_data_analysis(analysis_id: UUID, token: HTTPAuthorizationCredentials = D
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
-        data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="in progress")
+        data_analysis_object = omcmp.DataAnalysis.from_uuid(str(analysis_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("data analysis", analysis_id)
     if data_analysis_object is None:

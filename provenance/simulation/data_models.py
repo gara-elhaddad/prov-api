@@ -25,7 +25,7 @@ from typing import List, Union, Literal
 
 from pydantic import Field
 
-from fairgraph.base_v3 import KGProxy
+from fairgraph.base import KGProxy
 from fairgraph.utility import as_list
 import fairgraph.openminds.computation as omcmp
 import fairgraph.openminds.core as omcore
@@ -78,11 +78,11 @@ class Simulation(Computation):
 
     @classmethod
     def from_kg_object(cls, simulation_object, client):
-        dao = simulation_object.resolve(client, scope="in progress")
+        dao = simulation_object.resolve(client, scope="any")
         inputs = []
         for obj in as_list(dao.inputs):
             if isinstance(obj, KGProxy):
-                obj = obj.resolve(client, scope="in progress")
+                obj = obj.resolve(client, scope="any")
             if isinstance(obj, (omcore.File, omcmp.LocalFile)):
                 inputs.append(File.from_kg_object(obj, client))
             elif isinstance(obj, omcore.SoftwareVersion):
@@ -98,8 +98,8 @@ class Simulation(Computation):
             output=[File.from_kg_object(obj, client) for obj in as_list(dao.outputs)],
             environment=ComputationalEnvironment.from_kg_object(dao.environment, client),
             launch_config=LaunchConfiguration.from_kg_object(dao.launch_configuration, client),
-            start_time=dao.started_at_time,
-            end_time=dao.ended_at_time,
+            start_time=dao.start_time,
+            end_time=dao.end_time,
             started_by=Person.from_kg_object(dao.started_by, client),
             status=getattr(Status, status_name_map[dao.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(dao.resource_usages)],
@@ -119,6 +119,8 @@ class Simulation(Computation):
             resource_usage = [ru.to_kg_object(client) for ru in self.resource_usage]
         else:
             resource_usage = None
+        if self.id is None:
+            self.id = uuid4()
         obj = self.__class__.kg_cls(
             id=client.uri_from_uuid(str(self.id)),
             lookup_label=f"Simulation run by {started_by.full_name} on {self.start_time.isoformat()} [{self.id.hex[:7]}]",
@@ -126,8 +128,8 @@ class Simulation(Computation):
             outputs=outputs,
             environment=environment,
             launch_configuration=launch_configuration,
-            started_at_time=self.start_time,
-            ended_at_time=self.end_time,
+            start_time=self.start_time,
+            end_time=self.end_time,
             started_by=started_by,
             #was_informed_by= # todo
             status=ACTION_STATUS_TYPES[self.status.value],

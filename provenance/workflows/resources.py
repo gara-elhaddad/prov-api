@@ -63,14 +63,14 @@ def query_workflows(
         filters["recipe"] = recipe_id
     # todo: handle tags
     workflows = omcmp.WorkflowExecution.list(
-        kg_client, scope="in progress", space=space,
+        kg_client, scope="any", space=space,
         from_index=from_index, size=size, **filters)
     return [WorkflowExecution.from_kg_object(wf, kg_client) for wf in workflows]
 
 
 @router.post("/workflows/", response_model=WorkflowExecution, status_code=status.HTTP_201_CREATED)
 def store_recorded_workflow(
-    workflow: WorkflowExecution, 
+    workflow: WorkflowExecution,
     space: str = "myspace",
     token: HTTPAuthorizationCredentials = Depends(auth)
 ):
@@ -89,7 +89,7 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
-        workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="in progress")
+        workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("record of a workflow execution", workflow_id)
     if workflow_object is None:
