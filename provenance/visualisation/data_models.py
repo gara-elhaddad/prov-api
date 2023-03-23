@@ -40,7 +40,7 @@ class Visualisation(Computation):
     """Record of a data analysis"""
     kg_cls = omcmp.Visualization
 
-    type: Literal["data analysis"]
+    type: Literal["visualization"]
 
     @classmethod
     def from_kg_object(cls, visualization_object, client):

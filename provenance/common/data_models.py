@@ -128,6 +128,8 @@ class ComputationType(str, Enum):
     analysis = "data analysis"
     simulation = "simulation"
     optimization = "optimization"
+    datatransfer = "data transfer"
+    miscellaneous = "unknown"
     #preprocessing = "pre-processing"
 
 
