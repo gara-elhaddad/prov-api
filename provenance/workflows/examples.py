@@ -16,7 +16,7 @@ EXAMPLES = {
                     "algorithm": "SHA-1",
                     "value": "495534ad6bc23e91b3db8df24ef86fdf23e5e232"
                 },
-                "location": "file://input/sub-1_chs-32_hem-RH_ana-ISO000_stim-SPN.mat",
+                "location": None,
                 "size": 153765472
             }, {
                 "description":

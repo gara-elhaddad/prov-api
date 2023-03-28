@@ -116,6 +116,7 @@ class WorkflowExecution(BaseModel):
             recipe=recipe,
             stages=stages,
             configuration=omcore.Configuration(
+                lookup_label=f"Configuration for workflow execution {self.id}",
                 configuration=json.dumps(self.configuration, indent=2),
                 format=KGProxy(cls=omcore.ContentType,  # application/json
                                uri="https://kg.ebrains.eu/api/instances/098cd755-65bc-4e77-b3eb-7a940fff829a")
