@@ -15,19 +15,21 @@ from ..common.utils import invert_dict
 
 
 class WorkflowRecipeType(str, Enum):
-    cwl = "Common Workflow Language"
-    snakemake = "Snakemake"
-    unicore = "UNICORE Workflow"
+    cwl = "CWL workflow"
+    cwlcmd = "CWL command line tool"
+    snakemake = "Snakemake workflow"
+    unicore = "UNICORE workflow"
     generic_python = "Python script"
     jupyter = "Jupyter notebook"
 
 
 content_type_lookup = {
-    "application/vnd.commonworkflowlanguage.workflowdescription+yaml": WorkflowRecipeType.cwl,
+    "application/vnd.commonworkflowlanguage.workflow": WorkflowRecipeType.cwl,
+    "application/vnd.commonworkflowlanguage.cmdline": WorkflowRecipeType.cwlcmd,
     "application/vnd.snakemake.workflowrecipe": WorkflowRecipeType.snakemake,
     "application/vnd.unicore.workflowrecipe": WorkflowRecipeType.unicore,
     "text/x-python": WorkflowRecipeType.generic_python,
-    "application/x-ipynb+json": WorkflowRecipeType.jupyter
+    "application/x-ipynb+json": WorkflowRecipeType.jupyter,
 }
 
 
