@@ -295,7 +295,7 @@ class File(BaseModel):
             location = file_object.iri.value
         else:
             assert isinstance(file_object, omcmp.LocalFile)
-            location = f"file://{file_object.path}"
+            location = None  #f"file://{file_object.path}"
         return cls(
             format=format,
             hash=hash,
