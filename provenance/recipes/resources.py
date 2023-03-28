@@ -24,12 +24,13 @@ import logging
 
 from fairgraph.base import as_list
 import fairgraph.openminds.computation as omcmp
+import fairgraph.errors
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status as status_codes
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from ..auth.utils import get_kg_client_for_user_account
-from ..common.utils import patch_computation, delete_computation, NotFoundError
+from ..common.utils import patch_computation, delete_computation, NotFoundError, AuthenticationError
 from .data_models import WorkflowRecipe, WorkflowRecipePatch
 
 
@@ -54,9 +55,12 @@ def query_workflow_recipes(
     or that are associated with a collab of which the user is a member.
     """
     kg_client = get_kg_client_for_user_account(token.credentials)
-    recipes = omcmp.WorkflowRecipeVersion.list(
-        kg_client, scope="any", space=space, api="core",
-        from_index=from_index, size=size)
+    try:
+        recipes = omcmp.WorkflowRecipeVersion.list(
+            kg_client, scope="any", space=space, api="core",
+            from_index=from_index, size=size)
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
     return [WorkflowRecipe.from_kg_object(rcp, kg_client) for rcp in recipes]
 
 
@@ -72,6 +76,8 @@ def get_workflow_recipe(recipe_id: UUID, token: HTTPAuthorizationCredentials = D
         recipe_object = omcmp.WorkflowRecipeVersion.from_uuid(str(recipe_id), kg_client, scope="any")
     except TypeError as err:
         raise NotFoundError("workflow recipe", recipe_id)
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
     if recipe_object is None:
         raise NotFoundError("workflow recipe", recipe_id)
     return WorkflowRecipe.from_kg_object(recipe_object, kg_client)

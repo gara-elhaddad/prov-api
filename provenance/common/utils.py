@@ -3,6 +3,7 @@ import itertools
 from fastapi import HTTPException, status
 
 import fairgraph.openminds.computation as omcmp
+import fairgraph.errors
 from fairgraph.base import as_list
 
 from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
@@ -12,7 +13,10 @@ from ..auth.utils import get_kg_client_for_user_account, is_collab_admin
 def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
     if pydantic_obj.id is not None:
-        kg_computation_object = fairgraph_cls.from_uuid(str(pydantic_obj.id), kg_client, scope="any")
+        try:
+            kg_computation_object = fairgraph_cls.from_uuid(str(pydantic_obj.id), kg_client, scope="any")
+        except fairgraph.errors.AuthenticationError:
+            raise AuthenticationError()
         if kg_computation_object is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -21,14 +25,21 @@ def create_computation(pydantic_cls, fairgraph_cls, pydantic_obj, space, token):
             )
     pydantic_obj.id = uuid4()
     kg_computation_object = pydantic_obj.to_kg_object(kg_client)
-    kg_computation_object.save(kg_client, space=space, recursive=True)
+    try:
+        kg_computation_object.save(kg_client, space=space, recursive=True)
+    except fairgraph.errors.AuthenticationError:
+            raise AuthenticationError()
     return pydantic_cls.from_kg_object(kg_computation_object, kg_client)
 
 
 
 def replace_computation(pydantic_cls, fairgraph_cls, computation_id, pydantic_obj, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    try:
+        kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
+
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -48,7 +59,11 @@ def replace_computation(pydantic_cls, fairgraph_cls, computation_id, pydantic_ob
 
 def patch_computation(pydantic_cls, fairgraph_cls, computation_id, patch, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    try:
+        kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
+
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -67,7 +82,11 @@ def patch_computation(pydantic_cls, fairgraph_cls, computation_id, patch, token)
 
 def delete_computation(fairgraph_cls, computation_id, token):
     kg_client = get_kg_client_for_user_account(token.credentials)
-    kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    try:
+        kg_computation_object = fairgraph_cls.from_uuid(str(computation_id), kg_client, scope="any")
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
+
     if not (kg_computation_object.space == "myspace" or is_collab_admin(kg_computation_object.space, token.credentials)):
         raise HTTPException(
             status_code=403,
@@ -83,8 +102,14 @@ def invert_dict(D):
 
 def NotFoundError(computation_type, identifier):
     return HTTPException(
-        status_code=404,
+        status_code=status.HTTP_404_NOT_FOUND,
         detail=f"We could not find a record of a {computation_type} with identifier {identifier}"
+    )
+
+def AuthenticationError():
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unauthorized request. Have you supplied a valid token?"
     )
 
 

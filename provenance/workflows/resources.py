@@ -24,13 +24,14 @@ from datetime import datetime
 import logging
 
 import fairgraph.openminds.computation as omcmp
+import fairgraph.errors
 
 from fastapi import APIRouter, Depends, Header, Query, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import ValidationError
 
 from ..auth.utils import get_kg_client_for_user_account
-from ..common.utils import create_computation, delete_computation, NotFoundError
+from ..common.utils import create_computation, delete_computation, NotFoundError, AuthenticationError
 from .data_models import WorkflowExecution
 from .. import settings
 
@@ -62,9 +63,13 @@ def query_workflows(
     if recipe_id:
         filters["recipe"] = recipe_id
     # todo: handle tags
-    workflows = omcmp.WorkflowExecution.list(
-        kg_client, scope="any", space=space,
-        from_index=from_index, size=size, **filters)
+    try:
+        workflows = omcmp.WorkflowExecution.list(
+            kg_client, scope="any", space=space,
+            from_index=from_index, size=size, **filters)
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
+
     return [WorkflowExecution.from_kg_object(wf, kg_client) for wf in workflows]
 
 
@@ -90,6 +95,8 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
     kg_client = get_kg_client_for_user_account(token.credentials)
     try:
         workflow_object = omcmp.WorkflowExecution.from_uuid(str(workflow_id), kg_client, scope="any")
+    except fairgraph.errors.AuthenticationError:
+        raise AuthenticationError()
     except TypeError as err:
         raise NotFoundError("record of a workflow execution", workflow_id)
     if workflow_object is None:
