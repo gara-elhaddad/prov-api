@@ -11,7 +11,7 @@ import fairgraph.openminds.controlledterms as omterms
 import fairgraph.openminds.computation as omcmp
 from ..common.data_models import (Person, get_repository_host, get_repository_iri,
                                   get_repository_name, get_repository_type)
-from ..common.utils import invert_dict
+from ..common.utils import invert_dict, collab_id_from_space
 
 
 class WorkflowRecipeType(str, Enum):
@@ -47,6 +47,7 @@ class WorkflowRecipe(BaseModel):
     location: AnyUrl = None  # temporarily allow None, but really this should always be present
     version_identifier: str
     version_innovation: str = None
+    project_id: str
 
     @classmethod
     def from_kg_object(cls, recipe_version, client):
@@ -95,7 +96,8 @@ class WorkflowRecipe(BaseModel):
             #keywords=as_list(recipe_version.keywords),  # todo: resolve keyword objects
             location=location,
             version_identifier=recipe_version.version_identifier,
-            version_innovation=recipe_version.version_innovation
+            version_innovation=recipe_version.version_innovation,
+            project_id=collab_id_from_space(recipe_version.space)
         )
 
     def to_kg_object(self, client):

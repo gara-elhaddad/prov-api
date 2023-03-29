@@ -36,6 +36,8 @@ from ..common.data_models import (
     ComputationalEnvironment, File, SoftwareVersion, ACTION_STATUS_TYPES, status_name_map,
     ModelVersionReference, DatasetVersionReference
 )
+from ..common.utils import collab_id_from_space
+
 
 logger = logging.getLogger("ebrains-prov-api")
 
@@ -81,7 +83,8 @@ class DataCopy(Computation):
             status=getattr(Status, status_name_map[obj.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(ru, client) for ru in as_list(obj.resource_usages)],
             tags=as_list(obj.tags),
-            recipe_id=data_copy_object.recipe.uuid if data_copy_object.recipe else None
+            recipe_id=data_copy_object.recipe.uuid if data_copy_object.recipe else None,
+            project_id=collab_id_from_space(data_copy_object.space)
         )
 
     def to_kg_object(self, client):

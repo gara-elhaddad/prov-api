@@ -119,3 +119,10 @@ def expand_combinations(D):
         return [dict(zip(keys, v)) for v in itertools.product(*[as_list(v) for v in values])]
     else:
         return [D]
+
+
+def collab_id_from_space(space):
+    if space.startswith("collab-"):
+        return space[7:]
+    else:
+        return space

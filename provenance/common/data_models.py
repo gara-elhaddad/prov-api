@@ -695,6 +695,7 @@ class Computation(BaseModel):
     tags: List[str] = None
     description: str = None
     recipe_id: UUID = None
+    project_id: str = None
 
 
 class ComputationPatch(Computation):

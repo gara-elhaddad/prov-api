@@ -45,6 +45,7 @@ from ..common.data_models import (
     status_name_map,
     ComputationType
 )
+from ..common.utils import collab_id_from_space
 
 
 from .examples import EXAMPLES
@@ -106,7 +107,8 @@ class Simulation(Computation):
             status=getattr(Status, status_name_map[simulation_object.status.resolve(client).name]),
             resource_usage=[ResourceUsage.from_kg_object(obj, client) for obj in as_list(simulation_object.resource_usages)],
             tags=as_list(simulation_object.tags),
-            recipe_id=simulation_object.recipe.uuid if simulation_object.recipe else None
+            recipe_id=simulation_object.recipe.uuid if simulation_object.recipe else None,
+            project_id=collab_id_from_space(simulation_object.space)
         )
 
     def to_kg_object(self, client):

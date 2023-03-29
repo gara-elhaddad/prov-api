@@ -35,6 +35,7 @@ from ..visualisation.data_models import Visualisation
 from ..optimisation.data_models import Optimisation
 from ..datacopy.data_models import DataCopy
 from ..generic.data_models import GenericComputation
+from ..common.utils import collab_id_from_space
 
 
 class WorkflowRecipe(BaseModel):
@@ -60,6 +61,7 @@ class WorkflowExecution(BaseModel):
     )
     started_by: Person = None
     recipe_id: UUID = None
+    project_id: str = None
 
 
     @classmethod
@@ -93,7 +95,8 @@ class WorkflowExecution(BaseModel):
             configuration=config,
             stages=stages,
             recipe_id=weo.recipe.uuid if weo.recipe else None,
-            started_by=Person.from_kg_object(weo.started_by, client) if weo.started_by else None
+            started_by=Person.from_kg_object(weo.started_by, client) if weo.started_by else None,
+            project_id=collab_id_from_space(weo.space)
         )
 
     def to_kg_object(self, client):
