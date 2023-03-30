@@ -98,9 +98,9 @@ def get_recorded_workflow(workflow_id: UUID, token: HTTPAuthorizationCredentials
     except fairgraph.errors.AuthenticationError:
         raise AuthenticationError()
     except TypeError as err:
-        raise NotFoundError("record of a workflow execution", workflow_id)
+        raise NotFoundError("workflow execution", workflow_id)
     if workflow_object is None:
-        raise NotFoundError("record of a workflow execution", workflow_id)
+        raise NotFoundError("workflow execution", workflow_id)
     return WorkflowExecution.from_kg_object(workflow_object, kg_client)
 
 
