@@ -4,12 +4,7 @@
 # To build the image, from the parent directory:
 #   docker build -t prov_api -f deployment/Dockerfile .
 #
-# To run the application:
-#   docker run -d -p 443:443 -v /etc/letsencrypt:/etc/letsencrypt \
-#              -e KG_SERVICE_ACCOUNT_REFRESH_TOKEN \
-#              -e KG_SERVICE_ACCOUNT_CLIENT_ID \
-#              -e KG_SERVICE_ACCOUNT_SECRET \
-#              prov_api
+
 
 FROM debian:bullseye-slim
 
@@ -40,7 +35,7 @@ RUN rm /etc/nginx/sites-enabled/default
 COPY deployment/nginx-app.conf /etc/nginx/sites-enabled/
 COPY deployment/supervisor-app.conf /etc/supervisor/conf.d/
 
-EXPOSE 443
-#EXPOSE 80
+
+EXPOSE 80
 
 CMD ["supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisor-app.conf"]
